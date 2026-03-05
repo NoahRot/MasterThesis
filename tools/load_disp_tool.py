@@ -168,7 +168,6 @@ def load_load_disp_data(file : str, file_type : str):
         for i in range(0, len(data_lines)):
             data = data_lines[i].strip()
             data = data.split(';')
-            print(data)
             if len(data) != 5:
                 break
             t.append(float(data[0]))
@@ -183,3 +182,34 @@ def load_load_disp_data(file : str, file_type : str):
         print("ERROR: Unknown load file type. Please use 'abaqus' of 'experiment'")
 
     return t, RF2, U2
+
+"""
+Treat experimental data
+"""
+def treat_experimental_data(t, RF2, U2, nbr_point_threshold = 20):
+    # Find the index before the loading starts
+    mean_begining = np.mean(U2[:nbr_point_threshold])
+    std_begining = np.std(U2[:nbr_point_threshold])
+    mean_end = np.mean(U2[-nbr_point_threshold:])
+    std_end = np.std(U2[-nbr_point_threshold:])
+    index_start = 0
+
+    fig = plt.figure()
+    ax = fig.subplots(2,2)
+    ax[0,0].plot(t, U2)
+    ax[0,0].hlines(mean_begining,                  np.min(t), np.max(t), colors = "black", linestyles="-")
+    ax[0,0].hlines(mean_begining - 5*std_begining, np.min(t), np.max(t), colors = "black", linestyles="--")
+    ax[0,0].hlines(mean_begining + 5*std_begining, np.min(t), np.max(t), colors = "black", linestyles="--")
+    ax[0,0].hlines(mean_end,                  np.min(t), np.max(t), colors = "black", linestyles="-")
+    ax[0,0].hlines(mean_end - 5*std_end, np.min(t), np.max(t), colors = "black", linestyles="--")
+    ax[0,0].hlines(mean_end + 5*std_end, np.min(t), np.max(t), colors = "black", linestyles="--")
+    ax[0,0].set_xlabel("$t$ [s]")
+    ax[0,0].set_ylabel("$\Delta$ [mm]")
+
+    ax[0,1].plot(t, RF2)
+    ax[0,1].set_xlabel("$t$ [s]")
+    ax[0,1].set_ylabel("$L$ [N]")
+
+    ax[1,0].plot(U2, RF2)
+    ax[1,0].set_xlabel("$\Delta$ [mm]")
+    ax[1,0].set_ylabel("$L$ [N]")

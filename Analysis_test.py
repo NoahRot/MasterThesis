@@ -38,12 +38,13 @@ analysis1.print_all()
 analysis1.plot_details()
 """
 
-path2 = "../data/3_points_bending"
-file_name2 = "sample3_m120C.csv"
+path2 = "data_test"
+file_name2 = "3pointbending.csv"
+file_name2 = "load_disp.rpt"
 full_path2 = os.path.join(path2, file_name2)
-analysis2 = Analyzer_LD(full_path2, W, S, B, B_N, a0, nu, E, eta_pl, index_computation, min_point, r2_threshold, "experiment")
+analysis2 = Analyzer_LD(full_path2, W, S, B, B_N, a0, nu, E, eta_pl, index_computation, min_point, r2_threshold, "abaqus")
 
 analysis2.print_all()
-analysis2.plot_time()
+analysis2.plot_details()
 
 plt.show()
