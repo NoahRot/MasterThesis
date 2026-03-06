@@ -78,11 +78,12 @@ class Fracture(object):
         # Compute area under load-disp curve
         A_pl = np.trapz(load[:self.id_computation], disp[:self.id_computation])
 
-        # Add the rest of the area using stiffness
-        x0 = -self.elastic.intercept/self.elastic.stiffness
-        x1 = np.min(disp)
-        y1 = self.elastic.stiffness*x1 + self.elastic.intercept
-        A_pl += 0.5*(x1 - x0)*y1
+        # Add the rest of the area using stiffness if needed
+        if self.ld.load[0] >= 1e-6:
+            x0 = -self.elastic.intercept/self.elastic.stiffness
+            x1 = np.min(disp)
+            y1 = self.elastic.stiffness*x1 + self.elastic.intercept
+            A_pl += 0.5*(x1 - x0)*y1
 
         # Remove the triangle area below the index_computation
         x0 = -intercept_2/self.elastic.stiffness

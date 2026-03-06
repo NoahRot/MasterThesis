@@ -29,19 +29,19 @@ id_computation = -1
 
 specimen = Specimen(W, S, B, B_N, a0, nu, E, eta_pl)
 
-#ld = experiment_LD_reader("data_test/3pointbending.csv")
-#ld = experimental_LD_treatment(ld, 5, True)
-#elastic_region = elastic_region_determination_r2_max(ld, 10, True)
-#fracture = Fracture(specimen, elastic_region, ld, id_computation)
-#fracture.print_all()
-#fracture.plot_details()
-#fracture.report("experiment.txt")
-
-ld = abaqus_LD_reader("data_test/load_disp.rpt")
-elastic_region = elastic_region_determination_r2_method(ld, 3, 0.999, True)
+ld = experiment_LD_reader("data_test/3pointbending.csv")
+ld = experimental_LD_treatment(ld, 5, False)
+elastic_region = elastic_region_determination_r2_max(ld, 10, False)
 fracture = Fracture(specimen, elastic_region, ld, id_computation)
 fracture.print_all()
 fracture.plot_details()
-fracture.report("simulation.txt")
+#fracture.report("experiment.txt")
+
+ld = abaqus_LD_reader("data_test/load_disp.rpt")
+elastic_region = elastic_region_determination_r2_method(ld, 3, 0.999, False)
+fracture = Fracture(specimen, elastic_region, ld, id_computation)
+fracture.print_all()
+fracture.plot_details()
+#fracture.report("simulation.txt")
 
 plt.show()

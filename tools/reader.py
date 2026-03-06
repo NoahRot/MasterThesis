@@ -1,5 +1,5 @@
-from archive.load_disp_tool import *
 from tools.LoadDisplacement import LoadDispalcement
+import numpy as np
 
 """
 Load data from an Abaqus output file
