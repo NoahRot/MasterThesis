@@ -1,21 +1,97 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-class LoadDispalcement(object):
+"""
+A class representing a load-displacement curve.
+Input-Parameters:
+ - t (array[float]): time
+ - load (array[float]): load
+ - disp (array[float]): dispalcement
+Parameters:
+ - idx (array[int]): array of indices used to sort the load-disp to have a monotonic increasing array of displacement.
+   This is used to later compute the area using trapezoidal method without overlapping trapezes.
+   WARNING: The sort array is NOT computed when LoadDisplacement instance is created. At this point it is simply an array
+   going from 0 to length length of the array minus one by step of one. It is modified by other methods used to treat the 
+   load-displacement from experimental data. 
+"""
+class LoadDisplacement(object):
     def __init__(self, t, RF2, U2):
         self.t = t 
         self.load = RF2 
         self.disp = U2
         self.idx = np.linspace(0, len(U2)-1, len(U2), dtype=np.int32)
 
+    """
+    This method return two arrays sorted to have a monotonic increasing displacement.
+    Output:
+     - load (array[float]): sorted load
+     - disp (array[float]): sorted displacement  
+    """
     def get_LD_sorted(self):
         return self.load[self.idx], self.disp[self.idx]
 
 """
+Plot the load-displacement curve
+Input:
+ - ld (LoadDisplacement): Load-displacement data
+Output:
+ - fig (Figure): The figure
+ - ax (Axes): The axes used for the plot
+"""
+def plot_LD(ld : LoadDisplacement) -> tuple[plt.Figure, plt.Axes]:
+    fig = plt.figure()
+    ax = fig.subplots()
+    ax.plot(ld.disp, ld.load)
+
+    ax.set_xlabel("$\Delta$ [mm]")
+    ax.set_ylabel("$L$ [N]")
+    ax.legend()
+
+    return fig, ax
+
+"""
+Plot several load-displacement curves to compare them.
+Input:
+ - ld_list (list[LoadDisplacement]): A list containing the LoadDisplacement instances to compare
+ - legend (list[str]): A list containing the label of each LoadDisplacement instance. 
+   Can be None. In that case, no legend is generated.
+Output:
+ - fig (Figure): The figure
+ - ax (Axes): The axes used for the plot
+"""
+def plot_comparison_LD(ld_list : list[LoadDisplacement], legend : list[str] = None) -> tuple[plt.Figure, plt.Axes]:
+    if len(ld_list) != len(legend):
+        print("ERROR: not the same number of load-displacement than legend entries")
+        quit()
+
+    fig = plt.figure()
+    ax = fig.subplots()
+    
+    for i in range(0, len(ld_list)):
+        load, disp = ld_list[i].get_LD_sorted()
+        if legend != None:
+            ax.plot(disp, load, label=legend[i])
+        else:
+            ax.plot(disp, load)
+
+    ax.set_xlabel("$\Delta$ [mm]")
+    ax.set_ylabel("$L$ [N]")
+    ax.legend()
+
+    return fig, ax
+
+"""
 Treatement of the experimental data. Clamp the data to the data in ROI. Offset correctly the time and displacement.
 Create a sort array to correctly sort the data according to the dispalcement for the computation of the area under LD curve.
+Input:
+ - ld (LoadDisplacement): Load-displacement data
+ - nbr_point_threshold (int): Number of points used to compute the mean and std to find the beginning of the experiment.
+   WARNING: If too high, can take values on the ramp of the displacement
+ - debug_plot (bool): If true, plot a figures containing graphs that show the different steps of the treatment.
+Output:
+ - ld (LoadDisplacement): Treated load-displacement data
 """
-def experimental_LD_treatment(ld : LoadDispalcement, nbr_point_threshold = 5, debug_plot = False):
+def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int = 5, debug_plot : bool = False) -> LoadDisplacement:
     # Compute the std of the "nbr_point_threshold" first points
     mean_begining = np.mean(ld.disp[:nbr_point_threshold])
     std_begining = np.std(ld.disp[:nbr_point_threshold])
@@ -44,7 +120,7 @@ def experimental_LD_treatment(ld : LoadDispalcement, nbr_point_threshold = 5, de
 
     # Check the end index with the force
     for i in range(begin_index, end_index):
-        if ld.load[i+1] < 0.75*ld.load[i]:
+        if ld.load[i+1] < 0.8*ld.load[i]:
             end_index = i
             break 
 

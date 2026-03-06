@@ -6,17 +6,30 @@ import os
 """
 Compute the geometric function for the stress intensity factor computation
 Input:
-- a0 : (float) initial crack length
-- W : (float) width of the specimen
+- a0 (float): initial crack length
+- W (float): width of the specimen
 Output:
-- (float) geometric function
+- (float): geometric function
 """
 def geometric_fnc_K(a0 : float, W : float) -> float:
     r = a0/W
     return 3.0*np.sqrt(r)*(1.99 - r*(1.0-r)*(2.15 - 3.93*r + 2.7*r**2))/(2.0*(1.0 + 2.0*r)*(1.0-r)**1.5)
 
+"""
+A class that represent the fracture test.
+Input-Parameters:
+ - specimen (Specimen): The tested specimen 
+ - elastic (ElasticRegion): The elastic region of the test
+ - ld (LoadDispalcement): The load-displacement data
+ - id_computation (int): The index of the computed point
+Parameters:
+ - K (float): The stress intensity factor
+ - J_el (float): The elastic part of the J-integral
+ - J_pl (float): The plastic part of the J-integral
+ - J (float): The J-integral
+"""
 class Fracture(object):
-    def __init__(self, specimen : Specimen, elastic : ElasticRegion, ld : LoadDispalcement, id_computation : int):
+    def __init__(self, specimen : Specimen, elastic : ElasticRegion, ld : LoadDisplacement, id_computation : int):
         self.specimen = specimen
         self.elastic = elastic
         self.ld = ld
@@ -29,13 +42,6 @@ class Fracture(object):
 
     """
     Compute the stress intensity factor
-    Input:
-    - P : (float) load
-    - S : (float) span
-    - B : (float) thickness
-    - B_N : (float) net thickness
-    - W : (float) width
-    - a0 : (float) initial crack length
     Output:
     - (float) stress intensity factor
     """
@@ -46,10 +52,6 @@ class Fracture(object):
 
     """
     Compute the elastic J-integral
-    Input:
-    - K : (float) stress intensity factor
-    - nu : (float) Poisson ratio
-    - E : (float) Young modulus
     Output:
     - (float) J-integral elastic
     """
@@ -58,14 +60,6 @@ class Fracture(object):
 
     """
     Compute the plastic J-integral
-    Input:
-    - eta_pl : (float) ??? parameters to compute the J-elastic
-    - B_N : (float) net thickness
-    - b0 : (float) width minus initial crack length
-    - index_computation : (int) Index at which the J integral will be computed
-    - load : (np.array(float)) load array
-    - disp : (np.array(float)) displacement array
-    - stiffness : (float) stiffness (slope of the curve)
     Output:
     - (float) J-integral elastic
     """
@@ -93,7 +87,16 @@ class Fracture(object):
 
         return self.specimen.eta_pl*A_pl/(self.specimen.B_N*self.specimen.b0)
     
-    def plot_details(self):
+    """
+    Create a detailed plot of the load-displacement curve with all the relevant point curve and information
+    Input:
+     - save_fig (bool): Do you want to save the figure
+     - fig_name (str): path and name of the figure
+    Output:
+     - fig (Figure): The figure
+     - ax (Axes): The axes used for the plot
+    """
+    def plot_details(self, save_fig : bool = False, fig_name : str = None):
         load, disp = self.ld.get_LD_sorted()
         intercept_2 = -self.elastic.stiffness*disp[self.id_computation] + load[self.id_computation]
         #load, disp = self.ld.load, self.ld.disp
@@ -120,22 +123,34 @@ class Fracture(object):
         ax.plot(x0, 0, color="red", marker="x")
         ax.plot(x1, 0, color="red", marker="x")
         ax.plot(x1, y1, color="red", marker="x")
-        x0 = -self.elastic.intercept/self.elastic.stiffness
-        x1 = np.min(disp)
-        y1 = self.elastic.stiffness*x1 + self.elastic.intercept
-        ax.plot(x0, 0, color="green", marker="x")
-        ax.plot(x1, 0, color="green", marker="x")
-        ax.plot(x1, y1, color="green", marker="x")
 
         # Add area
         y_bottom = np.maximum(np.zeros_like(load), disp*self.elastic.stiffness+intercept_2)
         ax.fill_between(disp, load, y_bottom, color="blue", alpha=0.2, label="$A_{pl1}$")
-        ax.fill_between(np.array([x0, x1]), np.array([0.0, 0.0]), np.array([0.0, y1]), color="green", alpha=0.2, label="$A_{pl2}$")
+        if self.ld.load[0] >= 1e-6:
+            x0 = -self.elastic.intercept/self.elastic.stiffness
+            x1 = np.min(disp)
+            y1 = self.elastic.stiffness*x1 + self.elastic.intercept
+            ax.plot(x0, 0, color="green", marker="x")
+            ax.plot(x1, 0, color="green", marker="x")
+            ax.plot(x1, y1, color="green", marker="x")
+            ax.fill_between(np.array([x0, x1]), np.array([0.0, 0.0]), np.array([0.0, y1]), color="green", alpha=0.2, label="$A_{pl2}$")
 
         ax.set_xlabel("$\Delta$ [mm]")
         ax.set_ylabel("$L$ kN")
         ax.legend()
+
+        if save_fig:
+            if fig_name == None:
+                print("ERROR: Can not create the figure. The figure name is None")
+                quit()
+            fig.savefig(fig_name)
+
+        return fig, ax
     
+    """
+    Print all the data related to the fracture
+    """
     def print_all(self):
         print("="*60)
         print("Results for fracture: ")
@@ -145,12 +160,12 @@ class Fracture(object):
         # Specimen geometry
         # -------------------------
         print("\n--- Specimen geometry ---")
-        print(f" W   = {self.specimen.W:.3e} µm (specimen width)")
-        print(f" S   = {self.specimen.S:.3e} µm (span)")
-        print(f" B   = {self.specimen.B:.3e} µm (thickness)")
-        print(f" B_N = {self.specimen.B_N:.3e} µm (net thickness)")
-        print(f" a0  = {self.specimen.a0:.3e} µm (initial crack length)")
-        print(f" b0  = {self.specimen.b0:.3e} µm (remaining ligament)")
+        print(f" W   = {self.specimen.W:.3e} mm (specimen width)")
+        print(f" S   = {self.specimen.S:.3e} mm (span)")
+        print(f" B   = {self.specimen.B:.3e} mm (thickness)")
+        print(f" B_N = {self.specimen.B_N:.3e} mm (net thickness)")
+        print(f" a0  = {self.specimen.a0:.3e} mm (initial crack length)")
+        print(f" b0  = {self.specimen.b0:.3e} mm (remaining ligament)")
 
         # -------------------------
         # Material properties
@@ -166,9 +181,9 @@ class Fracture(object):
         intercept_2 = -self.elastic.stiffness*self.ld.disp[self.id_computation] + self.ld.load[self.id_computation]
         print("\n--- Elastic region detection ---")
         print(f" Yield load         = {self.ld.load[self.elastic.id_end]} N")
-        print(f" Yield displacement = {self.ld.disp[self.elastic.id_end]} micron")
+        print(f" Yield displacement = {self.ld.disp[self.elastic.id_end]} mm")
         print(f" Elastic end index  = {self.elastic.id_end}")
-        print(f" Stiffness (slope)  = {self.elastic.stiffness:.6e} N/m")
+        print(f" Stiffness (slope)  = {self.elastic.stiffness:.6e} N/mm")
         print(f" Intercept 1        = {self.elastic.intercept:.6e}")
         print(f" Intercept 2        = {intercept_2:.6e}")
 
@@ -177,23 +192,25 @@ class Fracture(object):
         # -------------------------
         print("\n--- Computation point ---")
         print(f" Index used        = {self.id_computation}")
-        print(f" Load P            = {self.ld.load[self.id_computation]:.6e} µN")
+        print(f" Load P            = {self.ld.load[self.id_computation]:.6e} N")
 
         # -------------------------
         # Fracture parameters
         # -------------------------
-        J_el = self.J_integral_el()
-        J_pl = self.J_integral_pl()
-        J = J_el + J_pl
         print("\n--- Fracture parameters ---")
-        print(f" K      = {self.stress_intensity_factor():.6e} MPa·√µm")
-        print(f" J_el   = {J_el:.6e} MPa·µm")
-        print(f" J_pl   = {J_pl:.6e} MPa·µm")
-        print(f" J_tot  = {J:.6e} MPa·µm")
+        print(f" K      = {self.K:.6e} MPa·√mm, {self.K*np.sqrt(1e-3):.6e} MPa·√m")
+        print(f" J_el   = {self.J_el:.6e} MPa·mm")
+        print(f" J_pl   = {self.J_pl:.6e} MPa·mm")
+        print(f" J_tot  = {self.J:.6e} MPa·mm")
 
         print("="*60)
 
-    def report(self, report_name):
+    """
+    Create a report (text file) containing the data of the fracture
+    Input:
+     - report_name (str): Path and name of the fiel of the report
+    """
+    def report(self, report_name : str):
         try:
             with open(report_name, "w") as f:
 
@@ -228,7 +245,7 @@ class Fracture(object):
                 f.write(f" Yield load         = {self.ld.load[self.elastic.id_end]} N\n")
                 f.write(f" Yield displacement = {self.ld.disp[self.elastic.id_end]} mm\n")
                 f.write(f" Elastic end index  = {self.elastic.id_end}\n")
-                f.write(f" Stiffness (slope)  = {self.elastic.stiffness:.6e} N/m\n")
+                f.write(f" Stiffness (slope)  = {self.elastic.stiffness:.6e} N/mm\n")
                 f.write(f" Intercept 1        = {self.elastic.intercept:.6e}\n")
                 f.write(f" Intercept 2        = {intercept_2:.6e}\n")
 
@@ -243,7 +260,7 @@ class Fracture(object):
                 # Fracture parameters
                 # -------------------------
                 f.write("\n--- Fracture parameters ---\n")
-                f.write(f" K      = {self.K:.6e} MPa mm^0.5\n")
+                f.write(f" K      = {self.K:.6e} MPa mm^0.5, {self.K*np.sqrt(1e-3):.6e} MPa m^0.5\n")
                 f.write(f" J_el   = {self.J_el:.6e} MPa mm^0.5\n")
                 f.write(f" J_pl   = {self.J_pl:.6e} MPa mm^0.5\n")
                 f.write(f" J_tot  = {self.J:.6e} MPa mm^0.5\n")
