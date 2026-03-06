@@ -42,6 +42,22 @@ def offset_LD_according_to_stiffness(ld : LoadDisplacement, elastic : ElasticReg
     return ld, elastic
 
 """
+TODO
+"""
+def elastic_region_uncertainty(ld : LoadDisplacement, elastic : ElasticRegion):
+    # Compute the correct values for stiffness and intercept
+    elastic_end = elastic.id_end
+    result = sci.stats.linregress(ld.disp[:elastic_end], ld.load[:elastic_end])
+
+    stiffness = result.slope
+    intercept = result.intercept
+
+    stiffness_u = result.stderr
+    intercept_u = result.intercept_stderr
+
+    return ElasticRegionUncertainties(elastic_end, stiffness, stiffness_u, intercept, intercept_u)
+
+"""
 Determine the elastic region using the maximum value of R^2
 Input:
  - ld (LoadDisplacement): Load-displacement data

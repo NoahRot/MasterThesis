@@ -4,6 +4,7 @@ from tools.plt_spec import *
 from tools.Specimen import *
 from tools.ElasticRegion import *
 from tools.Fracture import *
+from tools.MonteCarlo import *
 import os
 
 init_plt(latex=False)
@@ -36,7 +37,7 @@ test4 = "sample4_m120C.csv"
 
 specimen = Specimen(W, S, B, B_N, a0, nu, E, eta_pl)
 
-full_path = os.path.join(path, test1)
+full_path = os.path.join(path, test3)
 ld = experiment_LD_reader(full_path)
 plot_LD(ld)
 ld = experimental_LD_treatment(ld, 5, False)
@@ -44,8 +45,29 @@ elastic_region = elastic_region_determination_r2_max(ld, 10, False)
 ld, elastic_region = offset_LD_according_to_stiffness(ld, elastic_region)
 fracture = Fracture(specimen, elastic_region, ld, id_computation)
 fracture.print_all()
-fracture.plot_details(True, "fig/test1.svg")
-fracture.report("report/test1.txt")
+fracture.plot_details(True, "fig/test3.svg")
+fracture.report("report/test3.txt")
+
+specimen_u = SpecimenUncertainties(
+    W = 3.0,       # width [mm]
+    W_u = 0.01,    # uncertainty in width [mm]
+    S = 12.0,      # span [mm] (4*W)
+    S_u = 0.05,    # uncertainty in span [mm]
+    B = 4.0,       # thickness [mm]
+    B_u = 0.01,    # uncertainty in thickness [mm]
+    B_N = 4.0,     # net thickness [mm]
+    B_N_u = 0.01,  # uncertainty in net thickness [mm]
+    a0 = 1.5,      # initial crack length [mm]
+    a0_u = 0.01,   # uncertainty in crack length [mm]
+    nu = 0.3,      # Poisson ratio [-]
+    E = 210250,    # Young modulus [MPa]
+    E_u = 1000,    # uncertainty in Young modulus [MPa]
+    eta_pl = 1.9   # eta_pl [-]
+)
+elastic_u = elastic_region_uncertainty(ld, elastic_region)
+
+mc = FractureMC(specimen_u, elastic_u, ld, id_computation, 10000)
+mc.plot_mc_results(30)
 
 #ld2 = abaqus_LD_reader("data_test/load_disp.rpt")
 #elastic_region = elastic_region_determination_r2_method(ld2, 3, 0.999, False)
