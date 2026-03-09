@@ -14,8 +14,8 @@ def abaqus_LD_reader(file : str) -> LoadDisplacement:
         with open(file, "r") as f:
             lines = f.readlines()
     except:
-        print(f"ERROR: Cannot open file {file}")
-        quit()
+        print(f"ERROR: Can not open file {file}")
+        raise ValueError("Can not open file {file}")
 
     # Skip header lines (first 4 lines)
     data_lines = lines[4:]
@@ -55,8 +55,8 @@ def experiment_LD_reader(file : str) -> LoadDisplacement:
         with open(file, "r") as f:
             lines = f.readlines()
     except:
-        print(f"ERROR: Cannot open file {file}")
-        quit()
+        print(f"ERROR: Can not open file {file}")
+        raise ValueError("Can not open file {file}")
 
     # Skip header lines
     data_lines = lines[1:]

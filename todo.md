@@ -1,5 +1,3 @@
 - Check if sorting is really necessary.
 - Check if eat_pl sould be 1.9 or 2.0
-- (optional) dataclasses for Speciment
-- (optional) raise exception instead or quit()
 - Monte-Carlo analysis: find a way to compute error on A_pl

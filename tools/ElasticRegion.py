@@ -14,6 +14,15 @@ class ElasticRegion(object):
         self.stiffness = stiffness
         self.intercept = intercept
 
+"""
+Class representing the elastic region distribution for the uncertainties
+Input-Parameters:
+ - id_end (int): index of the end of the plastic region
+ - stiffness (float): stiffness (slope in the elastic region)
+ - stiffness_u (float): stiffness uncertainty
+ - intercept (float): interception of the stiffness line with the y-axis
+ - intercept_u (float): interception uncertainty
+"""
 class ElasticRegionDistribution(object):
     def __init__(self, id_end : int, stiffness : float, stiffness_u : float, intercept : float, intercept_u : float):
         self.id_end = id_end 
@@ -22,6 +31,22 @@ class ElasticRegionDistribution(object):
         self.intercept = intercept
         self.intercept_u = intercept_u
 
+    """
+    Create an elastic region without sampling the uncertainty
+    Output:
+     - (ElasticRegion): The ElasticRegion containing one float per parameter and not an array sampled
+    """
+    def simple(self) -> ElasticRegion:
+        return ElasticRegion(self.id_end, self.stiffness, self.intercept)
+
+    """
+    Create an elastic region using sampled parameters as arguments
+    Input:
+     - nbr_samples (int): The number of samples
+     - rng (Generator): random number generator from numpy
+    Output:
+     - (ElasticRegion): Elast region with sampled parameters
+    """
     def sample(self, nbr_samples : int, rng : np.random.Generator = None) -> ElasticRegion:
         if rng is None:
             rng = np.random.default_rng()
@@ -30,17 +55,25 @@ class ElasticRegionDistribution(object):
         intercept = rng.normal(self.intercept, self.intercept_u, nbr_samples)
         return ElasticRegion(self.id_end, stiffness, intercept)
 
-class ElasticRegionUncertainties(ElasticRegion):
-    def __init__(self,
-                 id_end: int,
-                 stiffness: float, stiffness_u: float,
-                 intercept: float, intercept_u: float):
+"""
+Compute the elastic region distribution from a load-displacment curve and an elastic region.
+WARNING: The elastic region must contain float as parameter and not arrays
+Input:
+ - ld (LoadDisplacement): Load-displacement data
+ - elastic (ElasticRegion): The elastic region containing float as parameters
+"""
+def elastic_region_distribution(ld : LoadDisplacement, elastic : ElasticRegion):
+    # Compute the correct values for stiffness and intercept
+    elastic_end = elastic.id_end
+    result = sci.stats.linregress(ld.disp[:elastic_end], ld.load[:elastic_end])
 
-        super().__init__(id_end, stiffness, intercept)
+    stiffness = result.slope
+    intercept = result.intercept
 
-        # uncertainties (standard deviations)
-        self.stiffness_u = stiffness_u
-        self.intercept_u = intercept_u
+    stiffness_u = result.stderr
+    intercept_u = result.intercept_stderr
+
+    return ElasticRegionDistribution(elastic_end, stiffness, stiffness_u, intercept, intercept_u)
 
 """
 Offset the load-displacement data such that the stiffness curve pass by the origin (0;0)
@@ -56,22 +89,6 @@ def offset_LD_according_to_stiffness(ld : LoadDisplacement, elastic : ElasticReg
     ld.disp += offset
     elastic.intercept = 0
     return ld, elastic
-
-"""
-TODO
-"""
-def elastic_region_uncertainty(ld : LoadDisplacement, elastic : ElasticRegion):
-    # Compute the correct values for stiffness and intercept
-    elastic_end = elastic.id_end
-    result = sci.stats.linregress(ld.disp[:elastic_end], ld.load[:elastic_end])
-
-    stiffness = result.slope
-    intercept = result.intercept
-
-    stiffness_u = result.stderr
-    intercept_u = result.intercept_stderr
-
-    return ElasticRegionUncertainties(elastic_end, stiffness, stiffness_u, intercept, intercept_u)
 
 """
 Determine the elastic region using the maximum value of R^2
@@ -118,6 +135,7 @@ Determine the elastic region using an R^2 threshold
 Input:
  - ld (LoadDisplacement): Load-displacement data
  - min_points (int): minimum number of points used initially to fit the curve
+ - r2_threshold (float): The threshold of R^2 as a stopping parameters
  - debug_plot (bool): If true, plot a figures of the progression of R^2
 Output:
  - (ElasticRegion): Elastic region
@@ -143,7 +161,7 @@ def elastic_region_determination_r2_method(ld : LoadDisplacement, min_points : i
     # Print error if can not find the elastic region
     if elastic_end == 0:
         print("ERROR: Can not determine the elastic region")
-        quit()
+        raise ValueError("Can not determine the elastic region")
 
     # Compute final stiffnes and intercept
     stiffness, intercept, r_value, p_value, std_err = sci.stats.linregress(ld.disp[:elastic_end], ld.load[:elastic_end])

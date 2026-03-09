@@ -29,9 +29,7 @@ eta_pl = 1.9 # ??? parameters to compute the J-elastic. It is 1.9 because we use
 
 id_computation = -1
 
-#path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
-path = "data_test"
-test = "3pointbending.csv"
+path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
 test1 = "sample1_m120C.csv"
 test2 = "sample2_m120C.csv"
 test3 = "sample3_m120C.csv"
@@ -39,17 +37,18 @@ test4 = "sample4_m120C.csv"
 
 specimen = Specimen(W, S, B, B_N, a0, nu, E, eta_pl)
 
-full_path = os.path.join(path, test)
+full_path = os.path.join(path, test3)
 ld = experiment_LD_reader(full_path)
+plot_LD(ld)
 ld = experimental_LD_treatment(ld, 5, False)
 elastic_region = elastic_region_determination_r2_max(ld, 10, False)
 ld, elastic_region = offset_LD_according_to_stiffness(ld, elastic_region)
-fracture = FractureBis(specimen, elastic_region, ld, id_computation)
+fracture = Fracture(specimen, elastic_region, ld, id_computation)
 fracture.print_all()
-fracture.plot_details(True, "fig/test.svg")
-#fracture.report("report/test.txt")
+fracture.plot_details(True, "fig/test3.svg")
+fracture.report("report/test3.txt")
 
-specimen_u = SpecimenUncertainties(
+specimen_u = SpecimenDistribution(
     W = 3.0,       # width [mm]
     W_u = 0.01,    # uncertainty in width [mm]
     S = 12.0,      # span [mm] (4*W)
@@ -65,12 +64,13 @@ specimen_u = SpecimenUncertainties(
     E_u = 1000,    # uncertainty in Young modulus [MPa]
     eta_pl = 1.9   # eta_pl [-]
 )
-elastic_u = elastic_region_uncertainty(ld, elastic_region)
+elastic_u = elastic_region_distribution(ld, elastic_region)
 
-mc = FractureMC(specimen_u, elastic_u, ld, id_computation, 100000)
+nbr_sample = 100000
+rng = np.random.default_rng()
+mc = FractureMC(specimen_u.sample(nbr_sample, rng), elastic_u.sample(nbr_sample, rng), ld, id_computation, 100000)
 mc.plot_mc_results(100)
-
-report_with_uncertainties("report/test.txt", fracture, mc)
+report_with_uncertainties("report/test.txt", fracture, mc, specimen_u, elastic_u)
 
 #ld2 = abaqus_LD_reader("data_test/load_disp.rpt")
 #elastic_region = elastic_region_determination_r2_method(ld2, 3, 0.999, False)

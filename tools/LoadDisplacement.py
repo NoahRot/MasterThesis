@@ -62,7 +62,7 @@ Output:
 def plot_comparison_LD(ld_list : list[LoadDisplacement], legend : list[str] = None) -> tuple[plt.Figure, plt.Axes]:
     if len(ld_list) != len(legend):
         print("ERROR: not the same number of load-displacement than legend entries")
-        quit()
+        raise ValueError("Not the same number of load-displacement than legend entries")
 
     fig = plt.figure()
     ax = fig.subplots()
@@ -106,7 +106,7 @@ def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int =
 
         if begin_index - 10 >= len(ld.disp):
             print("ERROR: Can not find the beginning of the U2 slope")
-            quit()
+            raise ValueError("Can not find the beginning of the U2 slope")
 
     # Get the index at which the slope stop (need 10 values in a row below mean-5*std)
     end_index = len(ld.disp) - 1
@@ -116,7 +116,7 @@ def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int =
 
         if end_index < 10:
             print("ERROR: Can not find the ending of the U2 slope")
-            quit()
+            raise ValueError("Can not find the ending of the U2 slope")
 
     # Check the end index with the force
     for i in range(begin_index, end_index):
