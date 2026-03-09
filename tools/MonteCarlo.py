@@ -7,6 +7,8 @@ from tools.Fracture import *
 
 class FractureMC(object):
     def __init__(self, specimen : SpecimenUncertainties, elastic : ElasticRegionUncertainties, ld : LoadDisplacement, id_computation : int, nbr_mc : int):
+        print(f"Running Monte Carlo simulation with {nbr_mc} iterations...")
+        
         self.id_computation = id_computation
         self.P = ld.load[self.id_computation]
 
@@ -31,7 +33,7 @@ class FractureMC(object):
         self.disp_min = np.min(disp)
         self.conditionnal_area = ld.load[0] >= 1e-6
 
-        # Compute area under load-disp curve
+        # Compute area under load-disp curve (TODO Find a way to compute uncertainty on A_pl)
         self.A_pl = np.trapz(load[:self.id_computation], disp[:self.id_computation])
 
         # MC computation
@@ -39,14 +41,27 @@ class FractureMC(object):
         self.J_integral_el()
         self.J_integral_pl()
 
+        self.J_el_mean = np.mean(self.J_el)
+        self.J_el_std = np.std(self.J_el)
+
+        self.J_pl_mean = np.mean(self.J_pl)
+        self.J_pl_std = np.std(self.J_pl)
+
+        self.J = self.J_el + self.J_pl
+        self.J_mean = np.mean(self.J)
+        self.J_std = np.std(self.J)
+
+        self.K_mean = np.mean(self.K)
+        self.K_std = np.std(self.K)
+
+        print("Monte Carlo simulation completed.")
+
     def stress_intensity_factor(self) -> float:
         f_geom = geometric_fnc_K(self.a0, self.W)
         self.K = self.P*self.S/(np.sqrt(self.B*self.B_N) * self.W**1.5) * f_geom
-        return self.K
 
     def J_integral_el(self) -> float:
         self.J_el =  self.K**2 * (1.0 - self.nu**2) / self.E
-        return self.J_el
 
     def J_integral_pl(self) -> float:
 
@@ -68,46 +83,115 @@ class FractureMC(object):
         A_pl -= 0.5*(x1 - x0)*y1
 
         self.J_pl = self.eta_pl*A_pl/(self.B_N*self.b0)
-        return self.J_pl
     
     def plot_mc_results(self, bins: int = 30):
-        """
-        Plot histograms of Monte Carlo results for fracture parameters.
-        
-        Parameters:
-            K_samples (np.ndarray): Array of stress intensity factor K from MC.
-            J_el_samples (np.ndarray): Array of elastic J-integral values from MC.
-            J_pl_samples (np.ndarray): Array of plastic J-integral values from MC.
-            bins (int): Number of bins for the histograms.
-        """
-        K_samples = self.K
-        J_el_samples = self.J_el
-        J_pl_samples = self.J_pl
-        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-        
         # K histogram
-        axes[0].hist(K_samples, bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
-        axes[0].axvline(np.mean(K_samples), color='red', linestyle='--', label=f'Mean: {np.mean(K_samples):.3f}')
-        axes[0].set_xlabel("K [MPa·√mm]")
-        axes[0].set_ylabel("Frequency")
-        axes[0].set_title("Stress Intensity Factor (K)")
-        axes[0].legend()
-        axes[0].grid(True, linestyle='--', alpha=0.5)
+        fig1, ax1 = plt.subplots()
+        ax1.hist(self.K, bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+        ax1.axvline(self.K_mean, color='red', linestyle='--', label=f'Mean: {self.K_mean:.3f}')
+        ax1.axvline(self.K_mean + self.K_std, color='black', linestyle='--', label=f'Std: {self.K_std:.3f}')
+        ax1.axvline(self.K_mean - self.K_std, color='black', linestyle='--')
+        ax1.set_xlabel("K [MPa·√mm]")
+        ax1.set_ylabel("Frequency")
+        ax1.set_title("Stress Intensity Factor ($K$)")
+        ax1.legend()
+        ax1.grid(True, linestyle='--', alpha=0.5)
         
         # J_el histogram
-        axes[1].hist(J_el_samples, bins=bins, color='lightgreen', edgecolor='black', alpha=0.7)
-        axes[1].axvline(np.mean(J_el_samples), color='red', linestyle='--', label=f'Mean: {np.mean(J_el_samples):.3f}')
-        axes[1].set_xlabel("J_el [MPa·mm]")
-        axes[1].set_ylabel("Frequency")
-        axes[1].set_title("Elastic J-integral (J_el)")
-        axes[1].legend()
-        axes[1].grid(True, linestyle='--', alpha=0.5)
+        fig2, ax2 = plt.subplots()
+        ax2.hist(self.J_el, bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+        ax2.axvline(self.J_el_mean, color='red', linestyle='--', label=f'Mean: {self.J_el_mean:.3f}')
+        ax2.axvline(self.J_el_mean + self.J_el_std, color='black', linestyle='--', label=f'Std: {self.J_el_std:.3f}')
+        ax2.axvline(self.J_el_mean - self.J_el_std, color='black', linestyle='--')
+        ax2.set_xlabel("J [MPa·mm]")
+        ax2.set_ylabel("Frequency")
+        ax2.set_title("J-integral elastic ($J_{el}$)")
+        ax2.legend()
+        ax2.grid(True, linestyle='--', alpha=0.5)
         
         # J_pl histogram
-        axes[2].hist(J_pl_samples, bins=bins, color='salmon', edgecolor='black', alpha=0.7)
-        axes[2].axvline(np.mean(J_pl_samples), color='red', linestyle='--', label=f'Mean: {np.mean(J_pl_samples):.3f}')
-        axes[2].set_xlabel("J_pl [MPa·mm]")
-        axes[2].set_ylabel("Frequency")
-        axes[2].set_title("Plastic J-integral (J_pl)")
-        axes[2].legend()
-        axes[2].grid(True, linestyle='--', alpha=0.5)
+        fig3, ax3 = plt.subplots()
+        ax3.hist(self.J_pl, bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+        ax3.axvline(self.J_pl_mean, color='red', linestyle='--', label=f'Mean: {self.J_pl_mean:.3f}')
+        ax3.axvline(self.J_pl_mean + self.J_pl_std, color='black', linestyle='--', label=f'Std: {self.J_pl_std:.3f}')
+        ax3.axvline(self.J_pl_mean - self.J_pl_std, color='black', linestyle='--')
+        ax3.set_xlabel("J [MPa·mm]")
+        ax3.set_ylabel("Frequency")
+        ax3.set_title("J-integral plastic ($J_{pl}$)")
+        ax3.legend()
+        ax3.grid(True, linestyle='--', alpha=0.5)
+
+        # J histogram
+        fig4, ax4 = plt.subplots()
+        ax4.hist(self.J, bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+        ax4.axvline(self.J_mean, color='red', linestyle='--', label=f'Mean: {self.J_mean:.3f}')
+        ax4.axvline(self.J_mean + self.J_std, color='black', linestyle='--', label=f'Std: {self.J_std:.3f}')
+        ax4.axvline(self.J_mean - self.J_std, color='black', linestyle='--')
+        ax4.set_xlabel("J [MPa·mm]")
+        ax4.set_ylabel("Frequency")
+        ax4.set_title("J-integral ($J$)")
+        ax4.legend()
+        ax4.grid(True, linestyle='--', alpha=0.5)
+
+def report_with_uncertainties(report_name : str, fracture : Fracture, uncertainties : FractureMC):
+    try:
+        with open(report_name, "w") as f:
+
+            f.write("="*60 + "\n")
+            f.write("Fracture report\n")
+            f.write("="*60 + "\n")
+
+            # -------------------------
+            # Specimen geometry
+            # -------------------------
+            f.write("\n--- Specimen geometry ---\n")
+            f.write(f" W   = {fracture.specimen.W:.3e} mm (specimen width)\n")
+            f.write(f" S   = {fracture.specimen.S:.3e} mm (span)\n")
+            f.write(f" B   = {fracture.specimen.B:.3e} mm (thickness)\n")
+            f.write(f" B_N = {fracture.specimen.B_N:.3e} mm (net thickness)\n")
+            f.write(f" a0  = {fracture.specimen.a0:.3e} mm (initial crack length)\n")
+            f.write(f" b0  = {fracture.specimen.b0:.3e} mm (remaining ligament)\n")
+
+            # -------------------------
+            # Material properties
+            # -------------------------
+            f.write("\n--- Material properties ---\n")
+            f.write(f" E  = {fracture.specimen.E:.3f} MPa (Young modulus)\n")
+            f.write(f" nu = {fracture.specimen.nu:.3f} (-) (Poisson ratio)\n")
+            f.write(f" eta_pl = {fracture.specimen.eta_pl:.3f} (-)\n")
+
+            # -------------------------
+            # Elastic region detection
+            # -------------------------
+            intercept_2 = -fracture.elastic.stiffness*fracture.ld.disp[fracture.id_computation] + fracture.ld.load[fracture.id_computation]
+            f.write("\n--- Elastic region detection ---\n")
+            f.write(f" Yield load         = {fracture.ld.load[fracture.elastic.id_end]} N\n")
+            f.write(f" Yield displacement = {fracture.ld.disp[fracture.elastic.id_end]} mm\n")
+            f.write(f" Elastic end index  = {fracture.elastic.id_end}\n")
+            f.write(f" Stiffness (slope)  = {fracture.elastic.stiffness:.6e} N/mm\n")
+            f.write(f" Intercept 1        = {fracture.elastic.intercept:.6e}\n")
+            f.write(f" Intercept 2        = {intercept_2:.6e}\n")
+
+            # -------------------------
+            # Load at computation point
+            # -------------------------
+            f.write("\n--- Computation point ---\n")
+            f.write(f" Index used        = {fracture.id_computation}\n")
+            f.write(f" Load P            = {fracture.ld.load[fracture.id_computation]:.6e} N\n")
+
+            # -------------------------
+            # Fracture parameters
+            # -------------------------
+            f.write("\n--- Fracture parameters ---\n")
+            f.write(f" K      = {fracture.K:.6e} MPa mm^0.5, {fracture.K*np.sqrt(1e-3):.6e} MPa m^0.5\n")
+            f.write(f" J_el   = {fracture.J_el:.6e} MPa mm^0.5\n")
+            f.write(f" J_pl   = {fracture.J_pl:.6e} MPa mm^0.5\n")
+            f.write(f" J_tot  = {fracture.J:.6e} MPa mm^0.5\n")
+
+            f.write("="*60 + "\n")
+
+        print(f"Report successfully written to {report_name}")
+
+    except Exception as e:
+        print(f"ERROR: Cannot create report file {report_name}")
+        print(f"Reason: {e}")

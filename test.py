@@ -29,7 +29,9 @@ eta_pl = 1.9 # ??? parameters to compute the J-elastic. It is 1.9 because we use
 
 id_computation = -1
 
-path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
+#path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
+path = "data_test"
+test = "3pointbending.csv"
 test1 = "sample1_m120C.csv"
 test2 = "sample2_m120C.csv"
 test3 = "sample3_m120C.csv"
@@ -37,16 +39,15 @@ test4 = "sample4_m120C.csv"
 
 specimen = Specimen(W, S, B, B_N, a0, nu, E, eta_pl)
 
-full_path = os.path.join(path, test3)
+full_path = os.path.join(path, test)
 ld = experiment_LD_reader(full_path)
-plot_LD(ld)
 ld = experimental_LD_treatment(ld, 5, False)
 elastic_region = elastic_region_determination_r2_max(ld, 10, False)
 ld, elastic_region = offset_LD_according_to_stiffness(ld, elastic_region)
-fracture = Fracture(specimen, elastic_region, ld, id_computation)
+fracture = FractureBis(specimen, elastic_region, ld, id_computation)
 fracture.print_all()
-fracture.plot_details(True, "fig/test3.svg")
-fracture.report("report/test3.txt")
+fracture.plot_details(True, "fig/test.svg")
+#fracture.report("report/test.txt")
 
 specimen_u = SpecimenUncertainties(
     W = 3.0,       # width [mm]
@@ -66,8 +67,10 @@ specimen_u = SpecimenUncertainties(
 )
 elastic_u = elastic_region_uncertainty(ld, elastic_region)
 
-mc = FractureMC(specimen_u, elastic_u, ld, id_computation, 10000)
-mc.plot_mc_results(30)
+mc = FractureMC(specimen_u, elastic_u, ld, id_computation, 100000)
+mc.plot_mc_results(100)
+
+report_with_uncertainties("report/test.txt", fracture, mc)
 
 #ld2 = abaqus_LD_reader("data_test/load_disp.rpt")
 #elastic_region = elastic_region_determination_r2_method(ld2, 3, 0.999, False)

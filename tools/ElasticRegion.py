@@ -14,6 +14,22 @@ class ElasticRegion(object):
         self.stiffness = stiffness
         self.intercept = intercept
 
+class ElasticRegionDistribution(object):
+    def __init__(self, id_end : int, stiffness : float, stiffness_u : float, intercept : float, intercept_u : float):
+        self.id_end = id_end 
+        self.stiffness = stiffness 
+        self.stiffness_u = stiffness_u
+        self.intercept = intercept
+        self.intercept_u = intercept_u
+
+    def sample(self, nbr_samples : int, rng : np.random.Generator = None) -> ElasticRegion:
+        if rng is None:
+            rng = np.random.default_rng()
+
+        stiffness = rng.normal(self.stiffness, self.stiffness_u, nbr_samples)
+        intercept = rng.normal(self.intercept, self.intercept_u, nbr_samples)
+        return ElasticRegion(self.id_end, stiffness, intercept)
+
 class ElasticRegionUncertainties(ElasticRegion):
     def __init__(self,
                  id_end: int,

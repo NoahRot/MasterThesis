@@ -1,3 +1,4 @@
+import numpy as np
 
 """
 Specimen class. Store parameters of the specimen geometry and material.
@@ -25,6 +26,36 @@ class Specimen(object):
         self.E = E
         self.eta_pl = eta_pl
         self.b0 = W - a0
+
+class SpecimenDistribution(object):
+    def __init__(self, W, W_u, S, S_u, B, B_u, B_N, B_N_u, a0, a0_u, nu, E, E_u, eta_pl):
+        self.W = W
+        self.W_u = W_u
+        self.S = S
+        self.S_u = S_u
+        self.B = B
+        self.B_u = B_u
+        self.B_N = B_N
+        self.B_N_u = B_N_u
+        self.a0 = a0
+        self.a0_u = a0_u
+        self.nu = nu
+        self.E = E
+        self.E_u = E_u
+        self.eta_pl = eta_pl
+
+    def sample(self, nbr_samples : int, rng : np.random.Generator = None) -> Specimen:
+        if rng is None:
+            rng = np.random.default_rng()
+
+        W_sampled = rng.normal(self.W, self.W_u, nbr_samples)
+        S_sampled = rng.normal(self.S, self.S_u, nbr_samples)
+        B_sampled = rng.normal(self.B, self.B_u, nbr_samples)
+        B_N_sampled = rng.normal(self.B_N, self.B_N_u, nbr_samples)
+        a0_sampled = rng.normal(self.a0, self.a0_u, nbr_samples)
+        E_sampled = rng.normal(self.E, self.E_u, nbr_samples)
+
+        return Specimen(W_sampled, S_sampled, B_sampled, B_N_sampled, a0_sampled, self.nu, E_sampled, self.eta_pl)
 
 class SpecimenUncertainties(Specimen):
 
