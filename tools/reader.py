@@ -1,5 +1,21 @@
 from tools.LoadDisplacement import LoadDisplacement
+from tools.CrackProfile import CrackProfile
 import numpy as np
+import pandas as pd
+
+"""
+Load data from a crack profile file
+Input:
+ - file (str): File path + name
+Output:
+ - (CrackProfile): Crack profile class
+"""
+def crack_profile_reader(file : str) -> CrackProfile:
+    df = pd.read_excel(file)
+    l_i = df["Unnamed: 1"][0:9].to_numpy()
+    a_i = df["length from microscope"][0:9].to_numpy()
+
+    return CrackProfile(l_i, a_i)
 
 """
 Load data from an Abaqus output file

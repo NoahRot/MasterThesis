@@ -98,53 +98,6 @@ class Fracture(object):
         self.J_el = J_integral_el(specimen, self.K)
         self.J_pl = J_integral_pl(specimen, elastic, self.A_total, self.load_computation, self.min_disp, self.conditional_area)
         self.J = self.J_el + self.J_pl
-#
-#    """
-#    Compute the stress intensity factor
-#    Output:
-#    - (float) stress intensity factor
-#    """
-#    def stress_intensity_factor(self) -> float:
-#        f_geom = geometric_fnc_K(self.specimen.a0, self.specimen.W)
-#        P = self.ld.load[self.id_computation]
-#        return P*self.specimen.S/(np.sqrt(self.specimen.B*self.specimen.B_N) * self.specimen.W**1.5) * f_geom
-#
-#    """
-#    Compute the elastic J-integral
-#    Output:
-#    - (float) J-integral elastic
-#    """
-#    def J_integral_el(self) -> float:
-#        return self.stress_intensity_factor()**2 * (1.0 - self.specimen.nu**2) / self.specimen.E
-#
-#    """
-#    Compute the plastic J-integral
-#    Output:
-#    - (float) J-integral elastic
-#    """
-#    def J_integral_pl(self) -> float:
-#        load, disp = self.ld.get_LD_sorted()
-#
-#        # Linear regression in the elastic region
-#        intercept_2 = -self.elastic.stiffness*disp[self.id_computation] + load[self.id_computation]
-#
-#        # Compute area under load-disp curve
-#        A_pl = np.trapz(load[:self.id_computation], disp[:self.id_computation])
-#
-#        # Add the rest of the area using stiffness if needed
-#        if self.ld.load[0] >= 1e-6:
-#            x0 = -self.elastic.intercept/self.elastic.stiffness
-#            x1 = np.min(disp)
-#            y1 = self.elastic.stiffness*x1 + self.elastic.intercept
-#            A_pl += 0.5*(x1 - x0)*y1
-#
-#        # Remove the triangle area below the index_computation
-#        x0 = -intercept_2/self.elastic.stiffness
-#        x1 = disp[self.id_computation]
-#        y1 = load[self.id_computation]
-#        A_pl -= 0.5*(x1 - x0)*y1
-#
-#        return self.specimen.eta_pl*A_pl/(self.specimen.B_N*self.specimen.b0)
     
     """
     Create a detailed plot of the load-displacement curve with all the relevant point curve and information

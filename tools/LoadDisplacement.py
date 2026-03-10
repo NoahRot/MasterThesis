@@ -28,6 +28,7 @@ class LoadDisplacement(object):
      - disp (array[float]): sorted displacement  
     """
     def get_LD_sorted(self):
+        return self.load, self.disp
         return self.load[self.idx], self.disp[self.idx]
 
 """
