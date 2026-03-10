@@ -22,6 +22,7 @@ class LoadDisplacement(object):
         self.idx = np.linspace(0, len(U2)-1, len(U2), dtype=np.int32)
 
     """
+    WARNING DO NOT SORT ANYMORE, BECAUSE OF ERROR AND IT DOES NOT CHANGE A LOT THE RESULTS
     This method return two arrays sorted to have a monotonic increasing displacement.
     Output:
      - load (array[float]): sorted load
@@ -46,7 +47,6 @@ def plot_LD(ld : LoadDisplacement) -> tuple[plt.Figure, plt.Axes]:
 
     ax.set_xlabel("$\Delta$ [mm]")
     ax.set_ylabel("$L$ [N]")
-    ax.legend()
 
     return fig, ax
 
@@ -78,6 +78,26 @@ def plot_comparison_LD(ld_list : list[LoadDisplacement], legend : list[str] = No
     ax.set_xlabel("$\Delta$ [mm]")
     ax.set_ylabel("$L$ [N]")
     ax.legend()
+
+    return fig, ax
+
+def plot_load(ld : LoadDisplacement) -> tuple[plt.Figure, plt.Axes]:
+    fig = plt.figure()
+    ax = fig.subplots()
+    ax.plot(ld.t, ld.load)
+
+    ax.set_xlabel("$t$ [s]")
+    ax.set_ylabel("$L$ [N]")
+
+    return fig, ax
+
+def plot_disp(ld : LoadDisplacement) -> tuple[plt.Figure, plt.Axes]:
+    fig = plt.figure()
+    ax = fig.subplots()
+    ax.plot(ld.t, ld.disp)
+
+    ax.set_xlabel("$t$ [s]")
+    ax.set_ylabel("$\Delta$ [mm]")
 
     return fig, ax
 
