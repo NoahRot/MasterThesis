@@ -87,7 +87,7 @@ class Fracture(object):
         self.id_computation = id_computation
 
         load, disp = self.ld.get_LD_sorted()                                            # Get the sorted load-displacement
-        self.A_total = np.trapz(load[:self.id_computation], disp[:self.id_computation]) # Compute the Area under the LD curve
+        self.A_total = np.trapz(load[:self.id_computation+1], disp[:self.id_computation+1]) # Compute the Area under the LD curve
         self.disp_computation = disp[id_computation]                                    # Get the displacement at the computation point
         self.load_computation = load[id_computation]                                    # Get the load at the computation point
         self.intercept_2 = -self.elastic.stiffness*disp[self.id_computation] + load[self.id_computation] # Get the intercept point for the second stiffness curve

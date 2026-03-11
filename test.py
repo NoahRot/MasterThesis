@@ -37,7 +37,7 @@ nbr_sample = 100000
 path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
 
 # vvv Change this vvv 
-test_nbr = 7
+test_nbr = 6
 # ^^^ Change this ^^^
 
 test1 = "sample1_m120C.csv"
@@ -65,8 +65,8 @@ crack_profile = crack_profile_reader(crack_path)
 
 specimen = Specimen(W, S, B, B_N, crack_profile.initial_crack_length(), nu, E, eta_pl)
 
-ld = experimental_LD_treatment(ld, 5, False)
-elastic_region = elastic_region_determination_r2_max(ld, 10, False)
+ld = experimental_LD_treatment(ld, 5, True)
+elastic_region = elastic_region_determination_r2_max(ld, 10, True)
 ld, elastic_region = offset_LD_according_to_stiffness(ld, elastic_region)
 
 fracture = Fracture(specimen, elastic_region, ld, id_computation)

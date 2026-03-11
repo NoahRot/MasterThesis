@@ -143,7 +143,7 @@ def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int =
     for i in range(begin_index, end_index):
         if ld.load[i+1] < 0.8*ld.load[i]:
             end_index = i
-            break 
+            break
 
     # Plot before treatment
     if debug_plot:
