@@ -4,6 +4,7 @@ from tools.Specimen import *
 from tools.ElasticRegion import *
 from tools.LoadDisplacement import *
 from tools.Fracture import *
+from tools.Logger import Logger
 
 class FractureMC(object):
     def __init__(self, specimen : Specimen, elastic : ElasticRegion, ld : LoadDisplacement, id_computation : int):
@@ -12,20 +13,21 @@ class FractureMC(object):
         self.id_computation = id_computation
         self.P = ld.load[self.id_computation]
 
-        load, disp = ld.get_LD_sorted()
-        self.load_computation = load[self.id_computation]
-        self.disp_computation = disp[self.id_computation]
-        self.disp_min = np.min(disp)
+        self.load_computation = ld.load[self.id_computation]
+        self.disp_computation = ld.disp[self.id_computation]
+        self.disp_min = np.min(ld.disp)
         self.intercept_2 = -elastic.stiffness*self.disp_computation + self.load_computation
         self.conditionnal_area = ld.load[0] >= 1e-6
 
         # Compute area under load-disp curve (TODO Find a way to compute uncertainty on A_pl)
-        self.A_pl = np.trapz(load[:self.id_computation], disp[:self.id_computation])
+        self.A_pl = np.trapz(ld.load[:self.id_computation], ld.disp[:self.id_computation])
 
         # MC computation
-        self.K = stress_intensity_factor(specimen, self.P)
-        self.J_el = J_integral_el(specimen, self.K)
+        self.K_el = stress_intensity_factor(specimen, self.P)
+        self.J_el = J_integral_el(specimen, self.K_el)
         self.J_pl = J_integral_pl(specimen, elastic, self.A_pl, self.load_computation, self.disp_min, self.conditionnal_area)
+        self.J_c = self.J_el + self.J_pl
+        self.K_Jc = np.sqrt(self.J_c*specimen.E_plain_strain)
 
         self.J_el_mean = np.mean(self.J_el)
         self.J_el_std = np.std(self.J_el)
@@ -33,28 +35,30 @@ class FractureMC(object):
         self.J_pl_mean = np.mean(self.J_pl)
         self.J_pl_std = np.std(self.J_pl)
 
-        self.J = self.J_el + self.J_pl
-        self.J_mean = np.mean(self.J)
-        self.J_std = np.std(self.J)
+        self.J_c_mean = np.mean(self.J_c)
+        self.J_c_std = np.std(self.J_c)
 
-        self.K_mean = np.mean(self.K)
-        self.K_std = np.std(self.K)
+        self.K_el_mean = np.mean(self.K_el)
+        self.K_el_std = np.std(self.K_el)
+
+        self.K_Jc_mean = np.mean(self.K_Jc)
+        self.K_Jc_std = np.std(self.K_Jc)
 
         print("Monte Carlo simulation completed.")
     
     def plot_mc_results(self, bins: int = 30):
         # K histogram
-        x = np.linspace(np.min(self.K), np.max(self.K), 1000)
-        y = 1/(self.K_std * np.sqrt(2 * np.pi)) * np.exp( - (x - self.K_mean)**2 / (2 * self.K_std**2))
+        x = np.linspace(np.min(self.K_el), np.max(self.K_el), 1000)
+        y = 1/(self.K_el_std * np.sqrt(2 * np.pi)) * np.exp( - (x - self.K_el_mean)**2 / (2 * self.K_el_std**2))
         fig1, ax1 = plt.subplots()
-        ax1.hist(self.K, bins=bins, color='skyblue', edgecolor='black', alpha=0.7, density=True)
-        ax1.axvline(self.K_mean, color='red', linestyle='--', label=f'Mean: {self.K_mean:.3f}')
-        ax1.axvline(self.K_mean + self.K_std, color='black', linestyle='--', label=f'Std: {self.K_std:.3f}')
-        ax1.axvline(self.K_mean - self.K_std, color='black', linestyle='--')
+        ax1.hist(self.K_el, bins=bins, color='skyblue', edgecolor='black', alpha=0.7, density=True)
+        ax1.axvline(self.K_el_mean, color='red', linestyle='--', label=f'Mean: {self.K_el_mean:.3f}')
+        ax1.axvline(self.K_el_mean + self.K_el_std, color='black', linestyle='--', label=f'Std: {self.K_el_std:.3f}')
+        ax1.axvline(self.K_el_mean - self.K_el_std, color='black', linestyle='--')
         ax1.plot(x,y,color="red")
         ax1.set_xlabel("K [MPa·√mm]")
         ax1.set_ylabel("Frequency")
-        ax1.set_title("Stress Intensity Factor ($K$)")
+        ax1.set_title("Stress Intensity Factor elastic ($K_{el}$)")
         ax1.legend()
         ax1.grid(True, linestyle='--', alpha=0.5)
         
@@ -89,13 +93,13 @@ class FractureMC(object):
         ax3.grid(True, linestyle='--', alpha=0.5)
 
         # J histogram
-        x = np.linspace(np.min(self.J), np.max(self.J), 1000)
-        y = 1/(self.J_std * np.sqrt(2 * np.pi)) * np.exp( - (x - self.J_mean)**2 / (2 * self.J_std**2))
+        x = np.linspace(np.min(self.J_c), np.max(self.J_c), 1000)
+        y = 1/(self.J_c_std * np.sqrt(2 * np.pi)) * np.exp( - (x - self.J_c_mean)**2 / (2 * self.J_c_std**2))
         fig4, ax4 = plt.subplots()
-        ax4.hist(self.J, bins=bins, color='skyblue', edgecolor='black', alpha=0.7, density=True)
-        ax4.axvline(self.J_mean, color='red', linestyle='--', label=f'Mean: {self.J_mean:.3f}')
-        ax4.axvline(self.J_mean + self.J_std, color='black', linestyle='--', label=f'Std: {self.J_std:.3f}')
-        ax4.axvline(self.J_mean - self.J_std, color='black', linestyle='--')
+        ax4.hist(self.J_c, bins=bins, color='skyblue', edgecolor='black', alpha=0.7, density=True)
+        ax4.axvline(self.J_c_mean, color='red', linestyle='--', label=f'Mean: {self.J_c_mean:.3f}')
+        ax4.axvline(self.J_c_mean + self.J_c_std, color='black', linestyle='--', label=f'Std: {self.J_c_std:.3f}')
+        ax4.axvline(self.J_c_mean - self.J_c_std, color='black', linestyle='--')
         ax4.plot(x,y,color="red")
         ax4.set_xlabel("J [MPa·mm]")
         ax4.set_ylabel("Frequency")
@@ -103,65 +107,58 @@ class FractureMC(object):
         ax4.legend()
         ax4.grid(True, linestyle='--', alpha=0.5)
 
-def report_with_uncertainties(report_name : str, fracture : Fracture, uncertainties : FractureMC, specimen_u : SpecimenDistribution, elastic_u : ElasticRegionDistribution):
-    try:
-        with open(report_name, "w") as f:
+def log_fracture_with_uncertainties(logger : Logger, fracture : Fracture, uncertainties : FractureMC, specimen_u : SpecimenDistribution, elastic_u : ElasticRegionDistribution):
+    logger.log("="*60)
+    logger.log("Results for fracture: ")
+    logger.log("="*60)
 
-            f.write("="*60 + "\n")
-            f.write("Fracture report\n")
-            f.write("="*60 + "\n")
+    # -------------------------
+    # Specimen geometry
+    # -------------------------
+    logger.log("\n--- Specimen geometry ---")
+    logger.log(f" W       = {specimen_u.W} pm {specimen_u.W_u} mm (specimen width)")
+    logger.log(f" S       = {specimen_u.S} pm {specimen_u.S_u} mm (span)")
+    logger.log(f" B       = {specimen_u.B} pm {specimen_u.B_u} mm (thickness)")
+    logger.log(f" B_N     = {specimen_u.B_N} pm {specimen_u.B_N_u} mm (net thickness)")
+    logger.log(f" a0      = {fracture.specimen.a0} mm (initial crack length)")
+    logger.log(f" b0      = {fracture.specimen.b0} mm (remaining ligament)")
+    logger.log(f" f(a0/W) = {geometric_fnc_K(fracture.specimen.a0, specimen_u.W)} (-) (geometric function)")
+    logger.log(f" eta_pl = {specimen_u.eta_pl:.3f} (-)")
 
-            # -------------------------
-            # Specimen geometry
-            # -------------------------
-            f.write("\n--- Specimen geometry ---\n")
-            f.write(f" W   = {specimen_u.W:.3e} pm {specimen_u.W_u} mm (specimen width)\n")
-            f.write(f" S   = {specimen_u.S:.3e} pm {specimen_u.S_u:.3e} mm (span)\n")
-            f.write(f" B   = {specimen_u.B:.3e} pm {specimen_u.B_u:.3e} mm (thickness)\n")
-            f.write(f" B_N = {specimen_u.B_N:.3e} pm {specimen_u.B_N_u:.3e} mm (net thickness)\n")
-            f.write(f" a0  = {fracture.specimen.a0:.3e} pm {specimen_u.crack_profile_dist.a_i_u:.3e} mm (initial crack length)\n")
-            f.write(f" b0  = {fracture.specimen.b0:.3e} mm (remaining ligament)\n")
+    # -------------------------
+    # Material properties
+    # -------------------------
+    logger.log("\n--- Material properties ---")
+    logger.log(f" E      = {specimen_u.E:.3f} pm {specimen_u.E_u:.3f} MPa (Young modulus)")
+    logger.log(f" E'     = {fracture.specimen.E_plain_strain:.3f} MPa (Effective modulus in plain strain)")
+    logger.log(f" nu     = {specimen_u.nu:.3f} (-) (Poisson ratio)")
 
-            # -------------------------
-            # Material properties
-            # -------------------------
-            f.write("\n--- Material properties ---\n")
-            f.write(f" E  = {specimen_u.E:.3f} pm {specimen_u.E_u:.3f} MPa (Young modulus)\n")
-            f.write(f" nu = {specimen_u.nu:.3f} (-) (Poisson ratio)\n")
-            f.write(f" eta_pl = {specimen_u.eta_pl:.3f} (-)\n")
+    # -------------------------
+    # Elastic region detection
+    # -------------------------
+    logger.log("\n--- Elastic region detection ---")
+    logger.log(f" Yield load         = {fracture.ld.load[elastic_u.id_end]} N")
+    logger.log(f" Yield displacement = {fracture.ld.disp[elastic_u.id_end]} mm")
+    logger.log(f" Elastic end index  = {elastic_u.id_end}")
+    logger.log(f" Stiffness (slope)  = {elastic_u.stiffness:.6f} pm {elastic_u.stiffness_u} N/mm")
+    logger.log(f" Intercept 1        = {elastic_u.intercept:.6f} pm {elastic_u.intercept_u} (Interception of y-axis for elastic region)")
+    logger.log(f" Intercept 2        = {fracture.intercept_2:.6f} (Interception of y-axis for computation point)")
 
-            # -------------------------
-            # Elastic region detection
-            # -------------------------
-            intercept_2 = -fracture.elastic.stiffness*fracture.ld.disp[fracture.id_computation] + fracture.ld.load[fracture.id_computation]
-            f.write("\n--- Elastic region detection ---\n")
-            f.write(f" Yield load         = {fracture.ld.load[fracture.elastic.id_end]:.3e} N\n")
-            f.write(f" Yield displacement = {fracture.ld.disp[fracture.elastic.id_end]:.3e} mm\n")
-            f.write(f" Elastic end index  = {fracture.elastic.id_end}\n")
-            f.write(f" Stiffness (slope)  = {fracture.elastic.stiffness:.6e} pm {elastic_u.stiffness_u} N/mm\n")
-            f.write(f" Intercept 1        = {fracture.elastic.intercept:.6e} pm {elastic_u.intercept_u}\n")
-            f.write(f" Intercept 2        = {intercept_2:.6e}\n")
+    # -------------------------
+    # Load at computation point
+    # -------------------------
+    logger.log("\n--- Computation point ---")
+    logger.log(f" Index used        = {elastic_u.id_end}")
+    logger.log(f" Load P            = {fracture.ld.load[elastic_u.id_end]:.3f} N")
 
-            # -------------------------
-            # Load at computation point
-            # -------------------------
-            f.write("\n--- Computation point ---\n")
-            f.write(f" Index used        = {fracture.id_computation}\n")
-            f.write(f" Load P            = {fracture.ld.load[fracture.id_computation]:.6e} N\n")
+    # -------------------------
+    # Fracture parameters
+    # -------------------------
+    logger.log("\n--- Fracture parameters ---")
+    logger.log(f" J_el   = {fracture.J_el:.6f} pm {uncertainties.J_el_std:.6f} MPa mm,        {fracture.J_el*1e-3:.6f} pm {uncertainties.J_el_std*1e-3:.6f} MPa m")
+    logger.log(f" J_pl   = {fracture.J_pl:.6f} pm {uncertainties.J_pl_std:.6f} MPa mm,        {fracture.J_pl*1e-3:.6f} pm {uncertainties.J_pl_std*1e-3:.6f} MPa m")
+    logger.log(f" J_c    = {fracture.J_c:.6f} pm {uncertainties.J_c_std:.6f} MPa mm,        {fracture.J_c*1e-3:.6f} pm {uncertainties.J_c_std*1e-3:.6f} MPa m")
+    logger.log(f" K_el   = {fracture.K_el:.6f} pm {uncertainties.K_el_std:.6f} MPa mm^0.5, {fracture.K_el*np.sqrt(1e-3):.6f} pm {uncertainties.K_el_std*np.sqrt(1e-3):.6f} MPa m^0.5")
+    logger.log(f" K_Jc   = {fracture.K_Jc:.6f} pm {uncertainties.K_Jc_std:.6f} MPa mm^0.5, {fracture.K_Jc*np.sqrt(1e-3):.6f} pm {uncertainties.K_Jc_std*np.sqrt(1e-3):.6f} MPa m^0.5")
 
-            # -------------------------
-            # Fracture parameters
-            # -------------------------
-            f.write("\n--- Fracture parameters ---\n")
-            f.write(f" K      = {fracture.K:.6e} pm {uncertainties.K_std:.6e} MPa mm^0.5, {fracture.K*np.sqrt(1e-3):.6e} pm {uncertainties.K_std*np.sqrt(1e-3):.6e} MPa m^0.5\n")
-            f.write(f" J_el   = {fracture.J_el:.6e} pm {uncertainties.J_el_std:.6e} MPa mm^0.5\n")
-            f.write(f" J_pl   = {fracture.J_pl:.6e} pm {uncertainties.J_pl_std:.6e} MPa mm^0.5\n")
-            f.write(f" J_tot  = {fracture.J:.6e} pm {uncertainties.J_std:.6e} MPa mm^0.5\n")
-
-            f.write("="*60 + "\n")
-
-        print(f"Report successfully written to {report_name}")
-
-    except Exception as e:
-        print(f"ERROR: Cannot create report file {report_name}")
-        print(f"Reason: {e}")
+    logger.log("="*60)

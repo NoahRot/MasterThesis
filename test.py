@@ -15,18 +15,18 @@ create_sns_palette()
 # Input parameters
 # -------------------------------
 # Speciemen parameters
-W = 3 # specimen width [mm]
+W = 4 # specimen width [mm]
 S = 4*W # span [mm]
-B = 4 # specimen thickness [mm]
+B = 3 # specimen thickness [mm]
 B_N = B # specimen net thickness [mm]
-a0 = 1.5 # initial crack length [mm]
+#a0 = 1.5 # initial crack length [mm]
 
 # Material data
 nu = 0.3 # Poisson ratio
 E = 210250 # Young modulus [MPa]
 
 # IDK
-eta_pl = 2.0 # ??? parameters to compute the J-elastic. It is 1.9 because we use the load-displacement curve
+eta_pl = 1.9 # parameters to compute the J-elastic.
 
 id_computation = -1
 nbr_sample = 100000
@@ -54,6 +54,9 @@ crack4 = "EU97C4_crack_length.xlsx"
 crack6 = "EU97C6_crack_length.xlsx"
 crack7 = "EU97C7_crack_length.xlsx"
 
+report_path = "report/test" + str(test_nbr) + ".txt"
+logger = Logger("cmd", report_path)
+
 # -------------------------------
 # Load data, treat and compute SIF and J-integral
 # -------------------------------
@@ -65,18 +68,22 @@ crack_profile = crack_profile_reader(crack_path)
 
 specimen = Specimen(W, S, B, B_N, crack_profile.initial_crack_length(), nu, E, eta_pl)
 
-ld = experimental_LD_treatment(ld, 5, True)
-elastic_region = elastic_region_determination_r2_max(ld, 10, True)
+ld = experimental_LD_treatment(ld, 5, False)
+elastic_region = elastic_region_determination_r2_max(ld, 10, False)
 ld, elastic_region = offset_LD_according_to_stiffness(ld, elastic_region)
 
 fracture = Fracture(specimen, elastic_region, ld, id_computation)
-fracture.print_all()
 fracture.plot_details(True, "fig/test" + str(test_nbr) + ".svg")
-fracture.report("report/test" + str(test_nbr) + ".txt")
+fracture.log(logger)
+logger.change_type("txt")
+fracture.log(logger)
 
 # -------------------------------
 # Compute uncertainties
 # -------------------------------
+
+logger2 = Logger("txt", "report/test" + str(test_nbr) + "_u.txt")
+
 crack_profile_u = crack_profile_distribution(crack_profile, 0.01, 0.01)
 
 specimen_u = SpecimenDistribution(
@@ -100,7 +107,7 @@ elastic_u = elastic_region_distribution(ld, elastic_region)
 rng = np.random.default_rng()
 mc = FractureMC(specimen_u.sample(nbr_sample, rng), elastic_u.sample(nbr_sample, rng), ld, id_computation)
 mc.plot_mc_results(100)
-report_with_uncertainties("report/test_u" + str(test_nbr) + ".txt", fracture, mc, specimen_u, elastic_u)
+log_fracture_with_uncertainties(logger2, fracture, mc, specimen_u, elastic_u)
 
 # -------------------------------
 # Load and compute Abaqus data 

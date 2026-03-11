@@ -1,6 +1,7 @@
 from tools.LoadDisplacement import *
 from tools.Specimen import *
 from tools.ElasticRegion import *
+from tools.Logger import Logger
 import os
 
 """
@@ -86,18 +87,18 @@ class Fracture(object):
         self.ld = ld
         self.id_computation = id_computation
 
-        load, disp = self.ld.get_LD_sorted()                                            # Get the sorted load-displacement
-        self.A_total = np.trapz(load[:self.id_computation+1], disp[:self.id_computation+1]) # Compute the Area under the LD curve
-        self.disp_computation = disp[id_computation]                                    # Get the displacement at the computation point
-        self.load_computation = load[id_computation]                                    # Get the load at the computation point
-        self.intercept_2 = -self.elastic.stiffness*disp[self.id_computation] + load[self.id_computation] # Get the intercept point for the second stiffness curve
-        self.min_disp = np.min(disp)                                                    # Get the minimum value of the displacement
+        self.A_total = np.trapz(self.ld.load[:self.id_computation], self.ld.disp[:self.id_computation]) # Compute the Area under the LD curve
+        self.disp_computation = self.ld.disp[id_computation]                                    # Get the displacement at the computation point
+        self.load_computation = self.ld.load[id_computation]                                    # Get the load at the computation point
+        self.intercept_2 = -self.elastic.stiffness*self.ld.disp[self.id_computation] + self.ld.load[self.id_computation] # Get the intercept point for the second stiffness curve
+        self.min_disp = np.min(self.ld.disp)                                                    # Get the minimum value of the displacement
         self.conditional_area = self.ld.load[0] >= 1e-6                                 # Condition if additionnal area should be computed
 
-        self.K = stress_intensity_factor(specimen, self.load_computation)
-        self.J_el = J_integral_el(specimen, self.K)
+        self.K_el = stress_intensity_factor(specimen, self.load_computation)
+        self.J_el = J_integral_el(specimen, self.K_el)
         self.J_pl = J_integral_pl(specimen, elastic, self.A_total, self.load_computation, self.min_disp, self.conditional_area)
-        self.J = self.J_el + self.J_pl
+        self.J_c = self.J_el + self.J_pl
+        self.K_Jc = np.sqrt(self.J_c*self.specimen.E_plain_strain)
     
     """
     Create a detailed plot of the load-displacement curve with all the relevant point curve and information
@@ -109,38 +110,36 @@ class Fracture(object):
      - ax (Axes): The axes used for the plot
     """
     def plot_details(self, save_fig : bool = False, fig_name : str = None):
-        load, disp = self.ld.get_LD_sorted()
-        #load, disp = self.ld.load, self.ld.disp
 
         fig = plt.figure()
         ax = fig.subplots()
 
         # Plot LD curve
-        ax.plot(disp, load, label="$L-\Delta$")
+        ax.plot(self.ld.disp, self.ld.load, label="$L-\Delta$")
 
         # Plot stiffness and elastic region
-        x = np.linspace((0.0-self.elastic.intercept)/self.elastic.stiffness, (np.max(load)-self.elastic.intercept)/self.elastic.stiffness, 2)
+        x = np.linspace((0.0-self.elastic.intercept)/self.elastic.stiffness, (np.max(self.ld.load)-self.elastic.intercept)/self.elastic.stiffness, 2)
         y = self.elastic.stiffness*x + self.elastic.intercept
         ax.plot(x, y, linestyle="--", color="black", label="Stiffness")
-        x = np.linspace((0.0-self.intercept_2)/self.elastic.stiffness, (np.max(load)-self.intercept_2)/self.elastic.stiffness, 2)
+        x = np.linspace((0.0-self.intercept_2)/self.elastic.stiffness, (np.max(self.ld.load)-self.intercept_2)/self.elastic.stiffness, 2)
         y = self.elastic.stiffness*x + self.intercept_2
         ax.plot(x, y, linestyle="--", color="black")
         ax.axvline(self.ld.disp[self.elastic.id_end], linestyle="-", color="black", label="Elastic region")
 
         # Add special points
         x0 = -self.intercept_2/self.elastic.stiffness
-        x1 = disp[self.id_computation]
-        y1 = load[self.id_computation]
+        x1 = self.ld.disp[self.id_computation]
+        y1 = self.ld.load[self.id_computation]
         ax.plot(x0, 0, color="red", marker="x")
         ax.plot(x1, 0, color="red", marker="x")
         ax.plot(x1, y1, color="red", marker="x")
 
         # Add area
-        y_bottom = np.maximum(np.zeros_like(load), disp*self.elastic.stiffness+self.intercept_2)
-        ax.fill_between(disp, load, y_bottom, color="blue", alpha=0.2, label="$A_{pl1}$")
+        y_bottom = np.maximum(np.zeros_like(self.ld.load), self.ld.disp*self.elastic.stiffness+self.intercept_2)
+        ax.fill_between(self.ld.disp, self.ld.load, y_bottom, color="blue", alpha=0.2, label="$A_{pl1}$")
         if self.ld.load[0] >= 1e-6:
             x0 = -self.elastic.intercept/self.elastic.stiffness
-            x1 = np.min(disp)
+            x1 = np.min(self.ld.disp)
             y1 = self.elastic.stiffness*x1 + self.elastic.intercept
             ax.plot(x0, 0, color="green", marker="x")
             ax.plot(x1, 0, color="green", marker="x")
@@ -160,124 +159,60 @@ class Fracture(object):
         return fig, ax
     
     """
-    Print all the data related to the fracture
+    Log all the data related to the fracture
     """
-    def print_all(self):
-        print("="*60)
-        print("Results for fracture: ")
-        print("="*60)
+    def log(self, logger : Logger):
+        logger.log("="*60)
+        logger.log("Results for fracture: ")
+        logger.log("="*60)
 
         # -------------------------
         # Specimen geometry
         # -------------------------
-        print("\n--- Specimen geometry ---")
-        print(f" W   = {self.specimen.W:.3e} mm (specimen width)")
-        print(f" S   = {self.specimen.S:.3e} mm (span)")
-        print(f" B   = {self.specimen.B:.3e} mm (thickness)")
-        print(f" B_N = {self.specimen.B_N:.3e} mm (net thickness)")
-        print(f" a0  = {self.specimen.a0:.3e} mm (initial crack length)")
-        print(f" b0  = {self.specimen.b0:.3e} mm (remaining ligament)")
+        logger.log("\n--- Specimen geometry ---")
+        logger.log(f" W       = {self.specimen.W:.3e} mm (specimen width)")
+        logger.log(f" S       = {self.specimen.S:.3e} mm (span)")
+        logger.log(f" B       = {self.specimen.B:.3e} mm (thickness)")
+        logger.log(f" B_N     = {self.specimen.B_N:.3e} mm (net thickness)")
+        logger.log(f" a0      = {self.specimen.a0:.3e} mm (initial crack length)")
+        logger.log(f" b0      = {self.specimen.b0:.3e} mm (remaining ligament)")
+        logger.log(f" f(a0/W) = {geometric_fnc_K(self.specimen.a0, self.specimen.W):.3e} (-) (geometric function)")
+        logger.log(f" eta_pl = {self.specimen.eta_pl:.3f} (-)")
 
         # -------------------------
         # Material properties
         # -------------------------
-        print("\n--- Material properties ---")
-        print(f" E  = {self.specimen.E:.3f} MPa (Young modulus)")
-        print(f" nu = {self.specimen.nu:.3f} (-) (Poisson ratio)")
-        print(f" eta_pl = {self.specimen.eta_pl:.3f} (-)")
+        logger.log("\n--- Material properties ---")
+        logger.log(f" E      = {self.specimen.E:.3f} MPa (Young modulus)")
+        logger.log(f" E'     = {self.specimen.E_plain_strain:.3f} MPa (Effective modulus in plain strain)")
+        logger.log(f" nu     = {self.specimen.nu:.3f} (-) (Poisson ratio)")
 
         # -------------------------
         # Elastic region detection
         # -------------------------
-        print("\n--- Elastic region detection ---")
-        print(f" Yield load         = {self.ld.load[self.elastic.id_end]} N")
-        print(f" Yield displacement = {self.ld.disp[self.elastic.id_end]} mm")
-        print(f" Elastic end index  = {self.elastic.id_end}")
-        print(f" Stiffness (slope)  = {self.elastic.stiffness:.6e} N/mm")
-        print(f" Intercept 1        = {self.elastic.intercept:.6e}")
-        print(f" Intercept 2        = {self.intercept_2:.6e}")
+        logger.log("\n--- Elastic region detection ---")
+        logger.log(f" Yield load         = {self.ld.load[self.elastic.id_end]} N")
+        logger.log(f" Yield displacement = {self.ld.disp[self.elastic.id_end]} mm")
+        logger.log(f" Elastic end index  = {self.elastic.id_end}")
+        logger.log(f" Stiffness (slope)  = {self.elastic.stiffness:.6e} N/mm")
+        logger.log(f" Intercept 1        = {self.elastic.intercept:.6e} (Interception of y-axis for elastic region)")
+        logger.log(f" Intercept 2        = {self.intercept_2:.6e} (Interception of y-axis for computation point)")
 
         # -------------------------
         # Load at computation point
         # -------------------------
-        print("\n--- Computation point ---")
-        print(f" Index used        = {self.id_computation}")
-        print(f" Load P            = {self.ld.load[self.id_computation]:.6e} N")
+        logger.log("\n--- Computation point ---")
+        logger.log(f" Index used        = {self.id_computation}")
+        logger.log(f" Load P            = {self.ld.load[self.id_computation]:.6e} N")
 
         # -------------------------
         # Fracture parameters
         # -------------------------
-        print("\n--- Fracture parameters ---")
-        print(f" K      = {self.K:.6e} MPa·√mm, {self.K*np.sqrt(1e-3):.6e} MPa·√m")
-        print(f" J_el   = {self.J_el:.6e} MPa·mm")
-        print(f" J_pl   = {self.J_pl:.6e} MPa·mm")
-        print(f" J_tot  = {self.J:.6e} MPa·mm")
+        logger.log("\n--- Fracture parameters ---")
+        logger.log(f" J_el   = {self.J_el:.6e} MPa mm, {self.J_el*1e-3:.6e} MPa m")
+        logger.log(f" J_pl   = {self.J_pl:.6e} MPa mm, {self.J_pl*1e-3:.6e} MPa m")
+        logger.log(f" J_c    = {self.J_c:.6e} MPa mm, {self.J_c*1e-3:.6e}  MPa m")
+        logger.log(f" K_el   = {self.K_el:.6e} MPa mm^0.5, {self.K_el*np.sqrt(1e-3):.6e} MPa m^0.5")
+        logger.log(f" K_Jc   = {self.K_Jc:.6e} MPa mm^0.5, {self.K_Jc*np.sqrt(1e-3):.6e} MPa m^0.5")
 
-        print("="*60)
-
-    """
-    Create a report (text file) containing the data of the fracture
-    Input:
-     - report_name (str): Path and name of the fiel of the report
-    """
-    def report(self, report_name : str):
-        try:
-            with open(report_name, "w") as f:
-
-                f.write("="*60 + "\n")
-                f.write("Fracture report\n")
-                f.write("="*60 + "\n")
-
-                # -------------------------
-                # Specimen geometry
-                # -------------------------
-                f.write("\n--- Specimen geometry ---\n")
-                f.write(f" W   = {self.specimen.W:.3e} mm (specimen width)\n")
-                f.write(f" S   = {self.specimen.S:.3e} mm (span)\n")
-                f.write(f" B   = {self.specimen.B:.3e} mm (thickness)\n")
-                f.write(f" B_N = {self.specimen.B_N:.3e} mm (net thickness)\n")
-                f.write(f" a0  = {self.specimen.a0:.3e} mm (initial crack length)\n")
-                f.write(f" b0  = {self.specimen.b0:.3e} mm (remaining ligament)\n")
-
-                # -------------------------
-                # Material properties
-                # -------------------------
-                f.write("\n--- Material properties ---\n")
-                f.write(f" E  = {self.specimen.E:.3f} MPa (Young modulus)\n")
-                f.write(f" nu = {self.specimen.nu:.3f} (-) (Poisson ratio)\n")
-                f.write(f" eta_pl = {self.specimen.eta_pl:.3f} (-)\n")
-
-                # -------------------------
-                # Elastic region detection
-                # -------------------------
-                f.write("\n--- Elastic region detection ---\n")
-                f.write(f" Yield load         = {self.ld.load[self.elastic.id_end]} N\n")
-                f.write(f" Yield displacement = {self.ld.disp[self.elastic.id_end]} mm\n")
-                f.write(f" Elastic end index  = {self.elastic.id_end}\n")
-                f.write(f" Stiffness (slope)  = {self.elastic.stiffness:.6e} N/mm\n")
-                f.write(f" Intercept 1        = {self.elastic.intercept:.6e}\n")
-                f.write(f" Intercept 2        = {self.intercept_2:.6e}\n")
-
-                # -------------------------
-                # Load at computation point
-                # -------------------------
-                f.write("\n--- Computation point ---\n")
-                f.write(f" Index used        = {self.id_computation}\n")
-                f.write(f" Load P            = {self.ld.load[self.id_computation]:.6e} N\n")
-
-                # -------------------------
-                # Fracture parameters
-                # -------------------------
-                f.write("\n--- Fracture parameters ---\n")
-                f.write(f" K      = {self.K:.6e} MPa mm^0.5, {self.K*np.sqrt(1e-3):.6e} MPa m^0.5\n")
-                f.write(f" J_el   = {self.J_el:.6e} MPa mm^0.5\n")
-                f.write(f" J_pl   = {self.J_pl:.6e} MPa mm^0.5\n")
-                f.write(f" J_tot  = {self.J:.6e} MPa mm^0.5\n")
-
-                f.write("="*60 + "\n")
-
-            print(f"Report successfully written to {report_name}")
-
-        except Exception as e:
-            print(f"ERROR: Cannot create report file {report_name}")
-            print(f"Reason: {e}")
+        logger.log("="*60)

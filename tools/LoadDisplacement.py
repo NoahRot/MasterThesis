@@ -7,30 +7,12 @@ Input-Parameters:
  - t (array[float]): time
  - load (array[float]): load
  - disp (array[float]): dispalcement
-Parameters:
- - idx (array[int]): array of indices used to sort the load-disp to have a monotonic increasing array of displacement.
-   This is used to later compute the area using trapezoidal method without overlapping trapezes.
-   WARNING: The sort array is NOT computed when LoadDisplacement instance is created. At this point it is simply an array
-   going from 0 to length length of the array minus one by step of one. It is modified by other methods used to treat the 
-   load-displacement from experimental data. 
 """
 class LoadDisplacement(object):
     def __init__(self, t, RF2, U2):
         self.t = t 
         self.load = RF2 
         self.disp = U2
-        self.idx = np.linspace(0, len(U2)-1, len(U2), dtype=np.int32)
-
-    """
-    WARNING DO NOT SORT ANYMORE, BECAUSE OF ERROR AND IT DOES NOT CHANGE A LOT THE RESULTS
-    This method return two arrays sorted to have a monotonic increasing displacement.
-    Output:
-     - load (array[float]): sorted load
-     - disp (array[float]): sorted displacement  
-    """
-    def get_LD_sorted(self):
-        return self.load, self.disp
-        return self.load[self.idx], self.disp[self.idx]
 
 """
 Plot the load-displacement curve
@@ -69,11 +51,10 @@ def plot_comparison_LD(ld_list : list[LoadDisplacement], legend : list[str] = No
     ax = fig.subplots()
     
     for i in range(0, len(ld_list)):
-        load, disp = ld_list[i].get_LD_sorted()
         if legend != None:
-            ax.plot(disp, load, label=legend[i])
+            ax.plot(ld_list[i].disp, ld_list[i].load, label=legend[i])
         else:
-            ax.plot(disp, load)
+            ax.plot(ld_list[i].disp, ld_list[i].load)
 
     ax.set_xlabel("$\Delta$ [mm]")
     ax.set_ylabel("$L$ [N]")
