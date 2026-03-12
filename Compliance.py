@@ -113,8 +113,6 @@ sample = "sample5_20C.csv"
 full_path = os.path.join(path, sample)
 ld = experiment_LD_reader(full_path)
 
-fig, ax = plot_LD(ld)
-
 stiffness_list = []
 disp_list = []
 load_list = []
@@ -123,11 +121,14 @@ load_list = []
 # Stiffness computation
 # -------------------------------
 peaks, stiffness, intercept = detect_slopes(ld, debug_plot=True)
+compliance = 1/stiffness 
+
+# TODO Obtain the J-a curve (need to understand link between the compliance and the crack length)
 
 fig3 = plt.figure()
 ax3 = fig3.subplots()
-ax3.plot(ld.disp[peaks], stiffness, marker="+")
+ax3.plot(ld.disp[peaks], compliance, marker="+")
 ax3.set_xlabel("$\Delta$ [mm]")
-ax3.set_ylabel("$S$ [N/mm]")
+ax3.set_ylabel("$C$ [mm/N]")
 
 plt.show()

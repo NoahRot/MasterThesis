@@ -34,6 +34,7 @@ nbr_sample = 100000
 path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
 
 list_test = [1, 2, 3, 4, 6, 7]
+list_test = [3, 4, 6, 7]
 test_name = ["sample", "_m120C.csv"]
 crack_name = ["EU97C", "_crack_length.xlsx"]
 report_name = ["report/test", ".txt"]
@@ -71,6 +72,7 @@ specimen_u = SpecimenDistribution(
 # -------------------------------
 ld_list = []
 legend_ld_list = []
+K_Jc_list = []
 
 i = 0
 for test in file_names:
@@ -117,10 +119,27 @@ for test in file_names:
 
     ld_list.append(ld)
     legend_ld_list.append("Test " + str(list_test[i]) + " $K_{Jc}$ = " + "{:.0f}".format(fracture.K_Jc*10**-1.5))
+    K_Jc_list.append(fracture.K_Jc*10**-1.5)
 
     i += 1
 
 plot_comparison_LD(ld_list, legend_ld_list)
+
+K_Jc = np.array(K_Jc_list)
+K_Jc_mean = np.mean(K_Jc)
+K_Jc_std = np.std(K_Jc)
+bar_label = []
+for i in list_test:
+    bar_label.append("Test " + str(i))
+fig = plt.figure()
+ax = fig.subplots()
+p = ax.bar(bar_label, np.array(K_Jc_list), edgecolor = "black", color="skyblue", label="$K_{Jc}$ Tests")
+ax.bar_label(p, label_type='center')
+ax.axhline(K_Jc_mean, label="$K_{Jc}$ mean = "+"{:.0f}".format(K_Jc_mean), color="red", linestyle="--")
+ax.axhline(K_Jc_mean + K_Jc_std, color="black", linestyle="-.", label="$K_{Jc}$ std = "+"{:.0f}".format(K_Jc_std))
+ax.axhline(K_Jc_mean - K_Jc_std, color="black", linestyle="-.")
+ax.set_ylabel("$K_{Jc}$ MPa mm$^{0.5}$")
+ax.legend()
 
 print("="*60)
 print(" Analysis completed")
