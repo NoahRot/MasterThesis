@@ -1,5 +1,23 @@
-import numpy as np
+"""
+Monte-Carlo method on fracture
 
+This module contains one class
+- FractureMC
+    Use Monte-Carlo on fracture
+This module contains one function
+- log_fracture_with_uncertainties
+    Log uncertainties and the fracture results
+        
+Author
+------
+ROTUNNO Noah
+
+Date
+----
+2026
+"""
+
+import numpy as np
 from tools.Specimen import *
 from tools.ElasticRegion import *
 from tools.LoadDisplacement import *
@@ -7,25 +25,81 @@ from tools.Fracture import *
 from tools.Logger import Logger
 
 class FractureMC(object):
+    """
+    Fracture Monte-Carlo uncertainty evaluation
+
+    Parameters
+    ----------
+    specimen : Specimen
+        Specimen data
+    elastic : ElasticRegion
+        Elastic region data
+    ld : LoadDisplacement
+        Load-displacement data
+    id_computation : int
+        Index of the computation point on the LD curve
+
+    Attributes
+    ----------
+    load_computation : float
+        Load at the computation point 
+    disp_computation : float
+        Displacement at the computation point
+    intercept_2 : ndarray
+        Interception with y-axis for the stiffness passing by the computation point
+    conditionnal_area : bool
+        Should the area before the beginning of the LD curve be computed in plastic area
+    A_pl : ndarray
+        Plastic area
+    K_el : float
+        Elastic stress intensity factor [MPa mm^0.5]
+    J_el : float
+        Elastic J-integral
+    J_pl : float
+        Plastic J-integral
+    J_c : float
+        J-integral
+    K_Jc : float 
+        Stress intensity factor
+    J_el_mean : float
+        Mean of the elastic J-integral using MC method
+    J_el_std : float
+        Standard deviation of the elastic J-integral using MC method
+    J_pl_mean : float
+        Mean of the plastic J-integral using MC method
+    J_pl_std : float
+        Standard deviation of the plastic J-integral using MC method
+    J_c_mean : float
+        Mean of the J-integral using MC method
+    J_c_std : float
+        Standard deviation of the J-integral using MC method
+    K_el_mean : float
+        Mean of the elastic SIF using MC method
+    K_el_std : float
+        Standard deviation of the elastic SIF using MC method
+    K_Jc_mean : float
+        Mean of the SIF using MC method
+    K_Jc_std : float
+        Standard deviation of the SIF using MC method
+    """
+    
     def __init__(self, specimen : Specimen, elastic : ElasticRegion, ld : LoadDisplacement, id_computation : int):
         print(f"Running Monte Carlo simulation...")
         
         self.id_computation = id_computation
-        self.P = ld.load[self.id_computation]
 
         self.load_computation = ld.load[self.id_computation]
         self.disp_computation = ld.disp[self.id_computation]
-        self.disp_min = np.min(ld.disp)
         self.intercept_2 = -elastic.stiffness*self.disp_computation + self.load_computation
         self.conditionnal_area = ld.load[0] >= 1e-6
 
-        # Compute area under load-disp curve (TODO Find a way to compute uncertainty on A_pl)
-        self.A_pl = np.trapz(ld.load[:self.id_computation], ld.disp[:self.id_computation])
+        # Compute area under load-disp curve
+        self.A_pl = A_plastic(ld, elastic.stiffness, id_computation, self.conditionnal_area)
 
         # MC computation
-        self.K_el = stress_intensity_factor(specimen, self.P)
+        self.K_el = stress_intensity_factor(specimen, self.load_computation)
         self.J_el = J_integral_el(specimen, self.K_el)
-        self.J_pl = J_integral_pl(specimen, elastic, self.A_pl, self.load_computation, self.disp_min, self.conditionnal_area)
+        self.J_pl = J_integral_pl(specimen, self.A_pl)
         self.J_c = self.J_el + self.J_pl
         self.K_Jc = np.sqrt(self.J_c*specimen.E_plain_strain)
 
@@ -47,6 +121,10 @@ class FractureMC(object):
         print("Monte Carlo simulation completed.")
     
     def plot_mc_results(self, bins: int = 30):
+        """
+        Plot the results of the Monte-Carlo method
+        """
+        
         # K histogram
         x = np.linspace(np.min(self.K_el), np.max(self.K_el), 1000)
         y = 1/(self.K_el_std * np.sqrt(2 * np.pi)) * np.exp( - (x - self.K_el_mean)**2 / (2 * self.K_el_std**2))
@@ -108,6 +186,23 @@ class FractureMC(object):
         ax4.grid(True, linestyle='--', alpha=0.5)
 
 def log_fracture_with_uncertainties(logger : Logger, fracture : Fracture, uncertainties : FractureMC, specimen_u : SpecimenDistribution, elastic_u : ElasticRegionDistribution):
+    """
+    Log the data with the uncertainties of the fracture
+
+    Parameters
+    ----------
+    logger : Logger
+        Logger
+    fracture : Fracture
+        Fracture results
+    uncertainties : FractureMC
+        Uncertainties from the Monte-Carlo method on fracture
+    specimen_u : SpecimenDistribution
+        Uncertainties distribution on the specimen parameters
+    elastic_u : ElasticRegionDistribution
+        Uncertainties distribution on the elastic region parameters
+    """
+    
     logger.log("="*60)
     logger.log("Results for fracture: ")
     logger.log("="*60)
@@ -123,15 +218,16 @@ def log_fracture_with_uncertainties(logger : Logger, fracture : Fracture, uncert
     logger.log(f" a0      = {fracture.specimen.a0} mm (initial crack length)")
     logger.log(f" b0      = {fracture.specimen.b0} mm (remaining ligament)")
     logger.log(f" f(a0/W) = {geometric_fnc_K(fracture.specimen.a0, specimen_u.W)} (-) (geometric function)")
-    logger.log(f" eta_pl = {specimen_u.eta_pl:.3f} (-)")
+    logger.log(f" eta_pl  = {specimen_u.eta_pl:.3f} (-)")
 
     # -------------------------
     # Material properties
     # -------------------------
     logger.log("\n--- Material properties ---")
-    logger.log(f" E      = {specimen_u.E:.3f} pm {specimen_u.E_u:.3f} MPa (Young modulus)")
-    logger.log(f" E'     = {fracture.specimen.E_plain_strain:.3f} MPa (Effective modulus in plain strain)")
-    logger.log(f" nu     = {specimen_u.nu:.3f} (-) (Poisson ratio)")
+    logger.log(f" E        = {specimen_u.E:.3f} pm {specimen_u.E_u:.3f} MPa (Young modulus)")
+    logger.log(f" E'       = {fracture.specimen.E_plain_strain:.3f} MPa (Effective modulus in plain strain)")
+    logger.log(f" nu       = {specimen_u.nu:.3f} (-) (Poisson ratio)")
+    logger.log(f" K_Jc lim = {fracture.specimen.K_Jc_lim:.3f} MPa mm^0.5, {fracture.specimen.K_Jc_lim*np.sqrt(1e-3):.3f} MPa m^0.5 (Maximum K_Jc)")
 
     # -------------------------
     # Elastic region detection

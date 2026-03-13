@@ -1,3 +1,3 @@
-- Check if sorting is really necessary.
 - Check if eat_pl sould be 1.9 or 2.0
 - Monte-Carlo analysis: find a way to compute error on A_pl
+- Make sure that when one create a Distribution object from an object, the parameters object contains float and not arrays

@@ -1,37 +1,81 @@
+"""
+This reader scripts provide functions to read data from several files and deserialized them in
+data classes.
+
+This scripts contains three functions:
+- crack_profile_reader
+    Read crack profile from an xlsx file and create a CrackProfile instance
+- abaqus_LD_reader
+    Read load-displacement data from an rpt file. It creates a LoadDispalcement instance
+- experiment_LD_reader
+    Read load-displacement data from an experiment csv file. It creates a LoadDispalcement instance
+
+Author
+------
+ROTUNNO Noah
+
+Date
+----
+2026
+"""
+
 from tools.LoadDisplacement import LoadDisplacement
 from tools.CrackProfile import CrackProfile
 import numpy as np
 import pandas as pd
 
-"""
-Load data from a crack profile file
-Input:
- - file (str): File path + name
-Output:
- - (CrackProfile): Crack profile class
-"""
 def crack_profile_reader(file : str) -> CrackProfile:
-    df = pd.read_excel(file)
-    l_i = df["Unnamed: 1"][0:9].to_numpy()
-    a_i = df["length from microscope"][0:9].to_numpy()
+    """
+    Load data of a crack profile
+
+    Parameters
+    ----------
+    file : str
+        File name (and path)
+
+    Returns
+    -------
+    CrackProfile
+        A crack profile instance
+    """
+    df = pd.read_excel(file)                            # Read xlsx file
+    l_i = df["Unnamed: 1"][0:9].to_numpy()              # Extract distance along the width
+    a_i = df["length from microscope"][0:9].to_numpy()  # Extract crack length
 
     return CrackProfile(l_i, a_i)
 
-"""
-Load data from an Abaqus output file
-Input:
- - file (str): File path + name
-Output:
- - ld (LoadDisplacement): the class representing the load-displacement
-"""
 def abaqus_LD_reader(file : str) -> LoadDisplacement:
+    """
+    Load LD data from an Abaqus output file
+
+    Parameters
+    ----------
+    file : str
+        File name (and path)
+
+    Returns
+    -------
+    LoadDisplacement
+        A load-displacement instance
+
+    Raises
+    ------
+    ValueError
+        If unable to open the file
+
+    Warnings
+    --------
+    The file must be a .rpt file composed of only U2 (displacement) and RF2 (reaction force),
+    meaning that the file will have three columns (time, displacement and load). The reader
+    assume that the data are provided in this order.
+    """
     # Open the file
     try:
         with open(file, "r") as f:
             lines = f.readlines()
     except:
-        print(f"ERROR: Can not open file {file}")
-        raise ValueError("Can not open file {file}")
+        print("ERROR: Can not open file " + file)
+        raise ValueError("Can not open file " + file)
 
     # Skip header lines (first 4 lines)
     data_lines = lines[4:]
@@ -57,15 +101,29 @@ def abaqus_LD_reader(file : str) -> LoadDisplacement:
     ld = LoadDisplacement(t, RF2*1e-6, U2*1e-3)
     return ld
 
-"""
-Load data from an experiment output file.
-WARNING: The data are not treated, only loaded.
-Input:
- - file (str): File path + name
-Output:
- - ld (LoadDisplacement): the class representing the load-displacement
-"""
 def experiment_LD_reader(file : str) -> LoadDisplacement:
+    """
+    Load LD data from an experiment output file
+
+    Parameters
+    ----------
+    file : str
+        File name (and path)
+
+    Returns
+    -------
+    LoadDisplacement
+        A load-displacement instance
+
+    Raises
+    ------
+    ValueError
+        If unable to open the file
+
+    Warnings
+    --------
+    The file must be a .csv file, the the .dat file.
+    """
     # Open the file
     try:
         with open(file, "r") as f:
@@ -77,7 +135,7 @@ def experiment_LD_reader(file : str) -> LoadDisplacement:
     # Skip header lines
     data_lines = lines[1:]
 
-    # Create numpy arrays
+    # Create lists for data extraction
     t   = []
     RF2 = []
     U2  = []

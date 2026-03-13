@@ -1,28 +1,76 @@
+"""
+Load-displacement data class and several functions used for ploting as well as treated the 
+experimental data
+
+This module contains one class
+- LoadDisplacement
+    Contains load-displacement data as function of time
+This module contains one class five functions
+- plot_LD
+    Plot the load-displacement curve
+- plot_comparison_LD
+    Plot several load-displacement curves to compare them
+- plot_load
+    Plot load as function of time
+- plot_disp
+    Plot displacement as function of time
+- experimental_LD_treatment
+    Treatement of the load-displacement experimental data
+
+Author
+------
+ROTUNNO Noah
+
+Date
+----
+2026
+"""
+
 import numpy as np
+from typing import Union
 import matplotlib.pyplot as plt
 
-"""
-A class representing a load-displacement curve.
-Input-Parameters:
- - t (array[float]): time
- - load (array[float]): load
- - disp (array[float]): dispalcement
-"""
 class LoadDisplacement(object):
-    def __init__(self, t, RF2, U2):
+    """
+    A class representing a load-displacement curve
+
+    Parameters
+    ----------
+    t : ndarray
+        Array of time values [s]
+    RF2 : ndarray
+        Array of load values (reaction force) [N]
+    U2 : ndarray
+        Array of displacement values [mm]
+
+    Note
+    ----
+    The time is give in seconds [s], the displacement in milimeters [mm] 
+    and the load in Newtons [N].
+    """
+    
+    def __init__(self, t : np.ndarray, RF2 : np.ndarray, U2 : np.ndarray):
         self.t = t 
         self.load = RF2 
         self.disp = U2
 
-"""
-Plot the load-displacement curve
-Input:
- - ld (LoadDisplacement): Load-displacement data
-Output:
- - fig (Figure): The figure
- - ax (Axes): The axes used for the plot
-"""
-def plot_LD(ld : LoadDisplacement) -> tuple[plt.Figure, plt.Axes]:
+def plot_LD(ld : LoadDisplacement) -> Union[plt.Figure, plt.Axes]:
+    """
+    Plot the load-displacement curve
+
+    Parameters
+    ----------
+    ld : LoadDisplacement
+        The load-displacement data
+
+    Returns
+    -------
+    plt.Figure
+        Figure created
+    plt.Axes
+        Axe created
+    """
+
     fig = plt.figure()
     ax = fig.subplots()
     ax.plot(ld.disp, ld.load)
@@ -32,18 +80,32 @@ def plot_LD(ld : LoadDisplacement) -> tuple[plt.Figure, plt.Axes]:
 
     return fig, ax
 
-"""
-Plot several load-displacement curves to compare them.
-Input:
- - ld_list (list[LoadDisplacement]): A list containing the LoadDisplacement instances to compare
- - legend (list[str]): A list containing the label of each LoadDisplacement instance. 
-   Can be None. In that case, no legend is generated.
-Output:
- - fig (Figure): The figure
- - ax (Axes): The axes used for the plot
-"""
-def plot_comparison_LD(ld_list : list[LoadDisplacement], legend : list[str] = None) -> tuple[plt.Figure, plt.Axes]:
-    if len(ld_list) != len(legend):
+def plot_comparison_LD(ld_list : list[LoadDisplacement], legend : Union[list[str], None] = None) -> Union[plt.Figure, plt.Axes]:
+    """
+    Plot several load-displacement curves to compare them
+
+    Parameters
+    ----------
+    ld_list : list[LoadDisplacement]
+        A list containing the load displacement data of each curve
+    legend : list[str] or None, default=None
+        A list containing the legend of each curve. Can be None, in this case, no legend is  displayed
+
+    Returns
+    -------
+    plt.Figure
+        Figure created
+    plt.Axes
+        Axe created
+
+    Raises
+    ------
+    ValueError
+        If the length of the legend (if not None) and list of LD curves are different
+    """
+
+    # Check length of legend and ld curves
+    if legend is not None and len(ld_list) != len(legend):
         print("ERROR: not the same number of load-displacement than legend entries")
         raise ValueError("Not the same number of load-displacement than legend entries")
 
@@ -51,7 +113,7 @@ def plot_comparison_LD(ld_list : list[LoadDisplacement], legend : list[str] = No
     ax = fig.subplots()
     
     for i in range(0, len(ld_list)):
-        if legend != None:
+        if legend is not None:
             ax.plot(ld_list[i].disp, ld_list[i].load, label=legend[i])
         else:
             ax.plot(ld_list[i].disp, ld_list[i].load)
@@ -62,7 +124,22 @@ def plot_comparison_LD(ld_list : list[LoadDisplacement], legend : list[str] = No
 
     return fig, ax
 
-def plot_load(ld : LoadDisplacement) -> tuple[plt.Figure, plt.Axes]:
+def plot_load(ld : LoadDisplacement) -> Union[plt.Figure, plt.Axes]:
+    """
+    Plot load as function of time
+
+    Parameters
+    ----------
+    ld : LoadDisplacement
+        The load-displacement data
+
+    Returns
+    -------
+    plt.Figure
+        Figure created
+    plt.Axes
+        Axe created
+    """
     fig = plt.figure()
     ax = fig.subplots()
     ax.plot(ld.t, ld.load)
@@ -72,7 +149,22 @@ def plot_load(ld : LoadDisplacement) -> tuple[plt.Figure, plt.Axes]:
 
     return fig, ax
 
-def plot_disp(ld : LoadDisplacement) -> tuple[plt.Figure, plt.Axes]:
+def plot_disp(ld : LoadDisplacement) -> Union[plt.Figure, plt.Axes]:
+    """
+    Plot displacement as function of time
+
+    Parameters
+    ----------
+    ld : LoadDisplacement
+        The load-displacement data
+
+    Returns
+    -------
+    plt.Figure
+        Figure created
+    plt.Axes
+        Axe created
+    """
     fig = plt.figure()
     ax = fig.subplots()
     ax.plot(ld.t, ld.disp)
@@ -82,18 +174,30 @@ def plot_disp(ld : LoadDisplacement) -> tuple[plt.Figure, plt.Axes]:
 
     return fig, ax
 
-"""
-Treatement of the experimental data. Clamp the data to the data in ROI. Offset correctly the time and displacement.
-Create a sort array to correctly sort the data according to the dispalcement for the computation of the area under LD curve.
-Input:
- - ld (LoadDisplacement): Load-displacement data
- - nbr_point_threshold (int): Number of points used to compute the mean and std to find the beginning of the experiment.
-   WARNING: If too high, can take values on the ramp of the displacement
- - debug_plot (bool): If true, plot a figures containing graphs that show the different steps of the treatment.
-Output:
- - ld (LoadDisplacement): Treated load-displacement data
-"""
 def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int = 5, debug_plot : bool = False) -> LoadDisplacement:
+    """
+    Treatement of the experimental data. Clamp the data to the data in ROI. Offset correctly the time and displacement.
+    Create a sort array to correctly sort the data according to the dispalcement for the computation of the area under LD curve.
+
+    Parameters
+    ----------
+    ld : LoadDisplacement
+        The load-displacement experimental data
+    nbr_point_threshold : int, default=5
+        Number of points used to compute the mean and std to find the beginning of the experiment
+    debug_plot : bool, default=False
+        If true, plot a figures containing graphs that show the different steps of the treatment
+
+    Returns
+    -------
+    LoadDisplacement
+        Treated load-displacement data
+
+    Warnings
+    --------
+    If nbr_point_threshold has been chosen too high, it can take values on the ramp of the displacement.
+    """
+    
     # Compute the std of the "nbr_point_threshold" first points
     mean_begining = np.mean(ld.disp[:nbr_point_threshold])
     std_begining = np.std(ld.disp[:nbr_point_threshold])
@@ -156,9 +260,6 @@ def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int =
     ld.t = ld.t[begin_index:end_index] - ld.t[begin_index]
     ld.disp = ld.disp[begin_index:end_index]
     ld.load = ld.load[begin_index:end_index]
-
-    # Sort the data to avoid overlapping between the trapezes for area computation
-    ld.idx = np.argsort(ld.disp)
 
     # Place first displacement at 0
     ld.disp -= np.min(ld.disp)

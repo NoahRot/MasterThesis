@@ -1,115 +1,215 @@
+"""
+Compute fracture related values
+
+This module contains one class
+- Fracture
+    Compute and store the data related to the fracture
+This module contains five functions
+- geometric_fnc_K
+    Compute the geometric function of the stress intensity factor
+- stress_intensity_factor
+    Compute the elastic stress intensity factor
+- J_integral_el
+    Compute the elastic J-integral
+- J_integral_pl
+    Compute the plastic J-integral
+- A_plastic
+    Plastic area computation
+    
+Author
+------
+ROTUNNO Noah
+
+Date
+----
+2026
+"""
+
 from tools.LoadDisplacement import *
 from tools.Specimen import *
 from tools.ElasticRegion import *
 from tools.Logger import Logger
-import os
 
-"""
-Compute the geometric function for the stress intensity factor computation
-Input:
-- a0 (float): initial crack length
-- W (float): width of the specimen
-Output:
- - (float): geometric function
-"""
-def geometric_fnc_K(a0 : float, W : float) -> float:
+def geometric_fnc_K(a0 : Union[float, np.ndarray], W : Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    """
+    Compute the geometric function for the stress intensity factor computation
+
+    Parameters
+    ----------
+    a0 : float or ndarray
+        Initial crack length [mm]
+    W : float or ndarray
+        Width of the specimen [mm]
+
+    Returns
+    -------
+    float or ndarray
+        Geometric value [-]
+    """
     r = a0/W
     return 3.0*np.sqrt(r)*(1.99 - r*(1.0-r)*(2.15 - 3.93*r + 2.7*r**2))/(2.0*(1.0 + 2.0*r)*(1.0-r)**1.5)
 
-"""
-Compute the stress intensity factor
-Input:
- - specimen (Specimen): The specimen to study
- - P (float/array): The load at the computationi point
-Output:
- - (float) stress intensity factor
-"""
-def stress_intensity_factor(specimen : Specimen, P) -> float:
+def stress_intensity_factor(specimen : Specimen, P : Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    """
+    Compute the elastic stress intensity factor
+
+    Parameters
+    ----------
+    specimen : Specimen
+        Specimen
+    P : float or ndarray
+        Load at computation point [N]
+
+    Returns
+    -------
+    float or ndarray
+        Stress intensity factor K_el [MPa mm^0.5]
+    """
     f_geom = geometric_fnc_K(specimen.a0, specimen.W)
     K = P*specimen.S/(np.sqrt(specimen.B*specimen.B_N) * specimen.W**1.5) * f_geom
     return K
 
-"""
-Compute the elastic J-integral
-Input:
- - specimen (Specimen): The specimen to study
- K (float/array): stress intensity factor
-Output:
- - (float) J-integral elastic
-"""
-def J_integral_el(specimen : Specimen, K) -> float:
+def J_integral_el(specimen : Specimen, K : Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    """
+    Compute the elastic J-integral
+
+    Parameters
+    ----------
+    specimen : Specimen
+        Specimen
+    K : float or ndarray
+        Stress intensity factor [MPa mm^0.5]
+
+    Returns
+    -------
+    float or ndarray
+        Elastic J-integral [MPa mm]
+    """
     J_el = K**2 * (1.0 - specimen.nu**2) / specimen.E
     return J_el
 
-"""
-Compute the plastic J-integral
-Input:
- - specimen (Specimen): The specimen to study
- - elastic (ElasticRegion): Elastic region of the test
- - A_total (float/array): Area under the LD curve
- - disp_computation (float/array): displacement at computation point
- - load_computation (float/array): load at computation point
- - intercept_2 (float/array): intercept point for the second stiffness curve
- - min_disp (float/array): minimum dispalcement of the test
- - conditional_area (float/array): should the conditional area be computed 
-Output:
- - (float) J-integral elastic
-"""
-def J_integral_pl(specimen : Specimen, elastic : ElasticRegion, A_total, load_computation, min_disp, conditional_area) -> float:
-    # Add the rest of the area using stiffness if needed
-    A_pl = A_total
-    if conditional_area:
-        A_pl += 0.5*elastic.stiffness*min_disp**2
+def J_integral_pl(specimen : Specimen, A_pl : Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    """
+    Compute the plastic J-integral
 
-    # Remove the triangle area below the index_computation
-    A_pl -= 0.5*load_computation**2/elastic.stiffness
+    Parameters
+    ----------
+    specimen : Specimen
+        Specimen
+    A_pl : float or ndarray
+        Plastic area [N mm]
 
+    Returns
+    -------
+    float or ndarray
+        Plastic J-integral [MPa mm]
+    """
     J_pl = specimen.eta_pl*A_pl/(specimen.B_N*specimen.b0)
     return J_pl
 
-"""
-A class that represent the fracture test.
-Input-Parameters:
- - specimen (Specimen): The tested specimen 
- - elastic (ElasticRegion): The elastic region of the test
- - ld (LoadDispalcement): The load-displacement data
- - id_computation (int): The index of the computed point
-Parameters:
- - K (float): The stress intensity factor
- - J_el (float): The elastic part of the J-integral
- - J_pl (float): The plastic part of the J-integral
- - J (float): The J-integral
-"""
+def A_plastic(ld : LoadDisplacement, stiffness : Union[float, np.ndarray], id_computation : int, conditional_area : bool) -> Union[float, np.ndarray]:
+    """
+    Compute plastic area
+
+    Parameters
+    ----------
+    ld : LoadDisplacement
+        Load-displacement data
+    stiffness : float or ndarray
+        Stiffness [N/mm]
+    id_computation : int
+        Index of the computation point on the LD curve
+    conditional_area : bool
+        Should the area before the beginning of the test be computed
+
+    Returns
+    -------
+    float or ndarray
+        The plastic area [N mm]
+    """
+    # Compute total area under curve
+    A_pl1 = np.trapezoid(ld.load[:id_computation], ld.disp[:id_computation])
+
+    # Add the part before the beginning of LD curve if requiered
+    if conditional_area:
+        A_pl2 = 0.25*((stiffness**2)*(np.min(ld.disp)**2) + np.min(ld.load)**2)/stiffness
+    else:
+        A_pl2 = 0
+
+    # Remove part under the stiffness at fracture point
+    A_rm = 0.5/stiffness*ld.load[id_computation]**2
+
+    return A_pl1 + A_pl2 - A_rm
+
 class Fracture(object):
+    """
+    Compute the fracture parameters from a test or a simulation
+
+    Parameters
+    ----------
+    specimen : Specimen
+        Specimen
+    elastic : ElasticRegion
+        Elastic region
+    ld : LoadDisplacement
+        Load-displacement data
+    id_computation : int
+        Index of the computation point on the LD curve
+
+    Attributes
+    ----------
+    conditional_area : bool
+        Should the area before the beginning of the LD curve be computed in plastic area
+    A_pl : float
+        Plastic area [N mm]
+    intercept_2 : float
+        Interception with y-axis for the stiffness passing by the computation point
+    K_el : float
+        Elastic stress intensity factor [MPa mm^0.5]
+    J_el : float
+        Elastic J-integral
+    J_pl : float
+        Plastic J-integral
+    J_c : float
+        J-integral
+    K_Jc : float 
+        Stress intensity factor
+    """
+    
     def __init__(self, specimen : Specimen, elastic : ElasticRegion, ld : LoadDisplacement, id_computation : int):
         self.specimen = specimen
         self.elastic = elastic
         self.ld = ld
         self.id_computation = id_computation
 
-        self.A_total = np.trapz(self.ld.load[:self.id_computation], self.ld.disp[:self.id_computation]) # Compute the Area under the LD curve
-        self.disp_computation = self.ld.disp[id_computation]                                    # Get the displacement at the computation point
-        self.load_computation = self.ld.load[id_computation]                                    # Get the load at the computation point
+        self.conditional_area = self.ld.load[0] >= 1e-6
+        self.A_pl = A_plastic(self.ld, self.elastic.stiffness, self.id_computation, self.conditional_area)
         self.intercept_2 = -self.elastic.stiffness*self.ld.disp[self.id_computation] + self.ld.load[self.id_computation] # Get the intercept point for the second stiffness curve
-        self.min_disp = np.min(self.ld.disp)                                                    # Get the minimum value of the displacement
-        self.conditional_area = self.ld.load[0] >= 1e-6                                 # Condition if additionnal area should be computed
 
-        self.K_el = stress_intensity_factor(specimen, self.load_computation)
+        self.K_el = stress_intensity_factor(specimen, self.ld.load[id_computation])
         self.J_el = J_integral_el(specimen, self.K_el)
-        self.J_pl = J_integral_pl(specimen, elastic, self.A_total, self.load_computation, self.min_disp, self.conditional_area)
+        self.J_pl = J_integral_pl(specimen, self.A_pl)
         self.J_c = self.J_el + self.J_pl
         self.K_Jc = np.sqrt(self.J_c*self.specimen.E_plain_strain)
-    
-    """
-    Create a detailed plot of the load-displacement curve with all the relevant point curve and information
-    Input:
-     - save_fig (bool): Do you want to save the figure
-     - fig_name (str): path and name of the figure
-    Output:
-     - fig (Figure): The figure
-     - ax (Axes): The axes used for the plot
-    """
-    def plot_details(self, save_fig : bool = False, fig_name : str = None):
+
+    def plot_details(self, save_fig : bool = False, fig_name : Union[str,None] = None) -> Union[plt.Figure, plt.Axes]:
+        """
+        Create a detailed plot of the load-displacement curve with all the relevant point curve and information
+
+        Parameters
+        ----------
+        save_fig : bool, default=False
+            Save the figure
+        fig_name : str or None, default=None
+            Name and path of the figure to save
+
+        Returns
+        -------
+        plt.Figure
+            Figure created
+        plt.Axes
+            Axe created
+        """
 
         fig = plt.figure()
         ax = fig.subplots()
@@ -147,7 +247,7 @@ class Fracture(object):
             ax.fill_between(np.array([x0, x1]), np.array([0.0, 0.0]), np.array([0.0, y1]), color="green", alpha=0.2, label="$A_{pl2}$")
 
         ax.set_xlabel("$\Delta$ [mm]")
-        ax.set_ylabel("$L$ kN")
+        ax.set_ylabel("$L$ [N]")
         ax.legend()
 
         if save_fig:
@@ -157,11 +257,17 @@ class Fracture(object):
             fig.savefig(fig_name)
 
         return fig, ax
-    
-    """
-    Log all the data related to the fracture
-    """
+
     def log(self, logger : Logger):
+        """
+        Log all the data related to the fracture
+
+        Parameters
+        ----------
+        logger : Logger
+            Logger to log the data
+        """
+
         logger.log("="*60)
         logger.log("Results for fracture: ")
         logger.log("="*60)
@@ -186,6 +292,7 @@ class Fracture(object):
         logger.log(f" E      = {self.specimen.E:.3f} MPa (Young modulus)")
         logger.log(f" E'     = {self.specimen.E_plain_strain:.3f} MPa (Effective modulus in plain strain)")
         logger.log(f" nu     = {self.specimen.nu:.3f} (-) (Poisson ratio)")
+        logger.log(f" K_Jc lim = {self.specimen.K_Jc_lim:.3f} MPa mm^0.5, {self.specimen.K_Jc_lim*np.sqrt(1e-3):.3f} MPa m^0.5 (Maximum K_Jc)")
 
         # -------------------------
         # Elastic region detection
@@ -197,6 +304,7 @@ class Fracture(object):
         logger.log(f" Stiffness (slope)  = {self.elastic.stiffness:.6e} N/mm")
         logger.log(f" Intercept 1        = {self.elastic.intercept:.6e} (Interception of y-axis for elastic region)")
         logger.log(f" Intercept 2        = {self.intercept_2:.6e} (Interception of y-axis for computation point)")
+        logger.log(f" A plastic          = {self.A_pl:.6e} (plastic area)")
 
         # -------------------------
         # Load at computation point

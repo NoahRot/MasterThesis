@@ -24,6 +24,7 @@ B_N = B # specimen net thickness [mm]
 # Material data
 nu = 0.3 # Poisson ratio
 E = 210250 # Young modulus [MPa]
+sigma_YS = 700 # Sield stress [MPa]
 
 # IDK
 eta_pl = 1.9 # parameters to compute the J-elastic.
@@ -37,7 +38,7 @@ nbr_sample = 100000
 path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
 
 # vvv Change this vvv 
-test_nbr = 6
+test_nbr = 10
 # ^^^ Change this ^^^
 
 test1 = "sample1_m120C.csv"
@@ -46,6 +47,7 @@ test3 = "sample3_m120C.csv"
 test4 = "sample4_m120C.csv"
 test6 = "sample6_m120C.csv"
 test7 = "sample7_m120C.csv"
+test7 = "sample8_m120C.csv"
 
 crack1 = "EU97C1_crack_length.xlsx"
 crack2 = "EU97C2_crack_length.xlsx"
@@ -53,6 +55,7 @@ crack3 = "EU97C3_crack_length.xlsx"
 crack4 = "EU97C4_crack_length.xlsx"
 crack6 = "EU97C6_crack_length.xlsx"
 crack7 = "EU97C7_crack_length.xlsx"
+crack8 = "EU97C8_crack_length.xlsx"
 
 report_path = "report/test" + str(test_nbr) + ".txt"
 logger = Logger("cmd", report_path)
@@ -66,10 +69,10 @@ crack_path = os.path.join(path, "EU97C" + str(test_nbr) + "_crack_length.xlsx")
 ld = experiment_LD_reader(full_path)
 crack_profile = crack_profile_reader(crack_path)
 
-specimen = Specimen(W, S, B, B_N, crack_profile.initial_crack_length(), nu, E, eta_pl)
+specimen = Specimen(W, S, B, B_N, crack_profile.initial_crack_length(), nu, E, eta_pl, sigma_YS)
 
-ld = experimental_LD_treatment(ld, 5, False)
-elastic_region = elastic_region_determination_r2_max(ld, 10, False)
+ld = experimental_LD_treatment(ld, 5, True)
+elastic_region = elastic_region_determination_r2_max(ld, 10, True)
 ld, elastic_region = offset_LD_according_to_stiffness(ld, elastic_region)
 
 fracture = Fracture(specimen, elastic_region, ld, id_computation)
@@ -98,7 +101,9 @@ specimen_u = SpecimenDistribution(
     nu = nu,      # Poisson ratio [-]
     E = E,    # Young modulus [MPa]
     E_u = 1000,    # uncertainty in Young modulus [MPa]
-    eta_pl = eta_pl,  # eta_pl [-]
+    eta_pl = eta_pl,  # eta_pl [-],
+    sigma_YS = sigma_YS,
+    sigma_YS_u = 1,
     crack_profile_dist = crack_profile_u
 )
 
@@ -112,16 +117,16 @@ log_fracture_with_uncertainties(logger2, fracture, mc, specimen_u, elastic_u)
 # -------------------------------
 # Load and compute Abaqus data 
 # -------------------------------
-#abaqus_path = "C:\\Users\\rotunn_n\\Documents\\Abaqus\\Charpy Models"
-#abaqus_rpt_1 = "charpy_1micron_L=1500micron_R=2mm\\load_disp.rpt"
-#abaqus_rpt_2 = "charpy_05micron_L=1500micron_R=2mm\\load_disp.rpt"
-#abaqus_rpt_3 = "charpy_01micron_L=1500micron_R=2mm\\load_disp.rpt"
-#
-#ld2 = abaqus_LD_reader(os.path.join(abaqus_path, abaqus_rpt_3))
-#elastic_region = elastic_region_determination_r2_method(ld2, 3, 0.999, False)
-#fracture = Fracture(specimen, elastic_region, ld2, id_computation)
-#fracture.print_all()
-#fracture.plot_details()
-#fracture.report("report\\simulation01.txt")
+abaqus_path = "C:\\Users\\rotunn_n\\Documents\\Abaqus\\Charpy Models"
+abaqus_rpt_1 = "charpy_1micron_L=1500micron_R=2mm\\load_disp.rpt"
+abaqus_rpt_2 = "charpy_05micron_L=1500micron_R=2mm\\load_disp.rpt"
+abaqus_rpt_3 = "charpy_01micron_L=1500micron_R=2mm\\load_disp.rpt"
+
+ld2 = abaqus_LD_reader(os.path.join(abaqus_path, abaqus_rpt_3))
+elastic_region = elastic_region_determination_r2_method(ld2, 3, 0.999, False)
+fracture = Fracture(specimen, elastic_region, ld2, id_computation)
+logger3 = Logger("txt", "report/abaqus01" + ".txt")
+fracture.log(logger3)
+fracture.plot_details()
 
 plt.show()

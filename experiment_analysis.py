@@ -20,6 +20,7 @@ S = 4*W # span [mm]
 B = 3 # specimen thickness [mm]
 B_N = B # specimen net thickness [mm]
 eta_pl = 1.9 # parameters to compute the J-elastic.
+sigma_YS = 700
 
 # Speciemen Material data
 nu = 0.3 # Poisson ratio
@@ -33,8 +34,8 @@ nbr_sample = 100000
 # -------------------------------
 path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
 
-list_test = [1, 2, 3, 4, 6, 7]
-list_test = [3, 4, 6, 7]
+list_test = [1, 2, 3, 4, 6, 7, 8]
+#list_test = [3, 4, 6, 7]
 test_name = ["sample", "_m120C.csv"]
 crack_name = ["EU97C", "_crack_length.xlsx"]
 report_name = ["report/test", ".txt"]
@@ -63,7 +64,9 @@ specimen_u = SpecimenDistribution(
     nu = nu,      # Poisson ratio [-]
     E = E,    # Young modulus [MPa]
     E_u = 10,    # uncertainty in Young modulus [MPa]
-    eta_pl = eta_pl,  # eta_pl [-]
+    eta_pl = eta_pl,  # eta_pl [-],
+    sigma_YS = sigma_YS,
+    sigma_YS_u = 1,
     crack_profile_dist = None
 )
 
@@ -87,7 +90,7 @@ for test in file_names:
     ld = experiment_LD_reader(test[0])
     crack_profile = crack_profile_reader(test[1])
     logger = Logger("txt", test[2])
-    specimen = Specimen(W, S, B, B_N, crack_profile.initial_crack_length(), nu, E, eta_pl)
+    specimen = Specimen(W, S, B, B_N, crack_profile.initial_crack_length(), nu, E, eta_pl, sigma_YS)
 
     ld = experimental_LD_treatment(ld, 5, False)
     elastic_region = elastic_region_determination_r2_max(ld, 10, False)
