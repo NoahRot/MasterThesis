@@ -16,7 +16,7 @@ class Logger(object):
     
     def __init__(self, type : str = "cmd", file_path : Union[str, None] = None):
         try:
-            self.file = open(file_path, "w")
+            self.file = open(file_path, "w", encoding="utf-8")
         except Exception as e:
             print(f"ERROR: Cannot create report file {file_path}")
             print(f"Reason: {e}")
@@ -41,14 +41,14 @@ class Logger(object):
         elif type == "txt":
             # Check if fiel exist
             if self.file is None:
-                print(f"ERROR: log file is None. Impossible to switch to text file logging. Logging mode stay on 'cmd'")
+                print(f"WARNING: log file is None. Impossible to switch to text file logging. Logging mode stay on 'cmd'")
                 self.type = 0
             else:
                 self.type = 1
         
         else:
             # Nonexistant logging mode
-            print(f"ERROR: Unknown log type. Use 'cmd' or 'txt. Will use 'cmd' as default")
+            print(f"WARNING: Unknown log type. Use 'cmd' or 'txt. Will use 'cmd' as default")
             self.type = 0
 
     def log(self, message : str):

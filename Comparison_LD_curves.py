@@ -6,6 +6,7 @@ from tools.Specimen import *
 from tools.ElasticRegion import *
 from tools.Fracture import *
 from tools.MonteCarlo import *
+from tools.MasterCurve import *
 import os
 
 def single_T_master_curve_analysis(fractures : list[Fracture], T : float):
@@ -22,13 +23,14 @@ def single_T_master_curve_analysis(fractures : list[Fracture], T : float):
         if f.K_Jc < f.specimen.K_Jc_lim:
             nbr_uncencored_data += 1
             K_Jci.append(f.K_Jc*10**-1.5)
-            K_Jc_lim.append(f.specimen.K_Jc_lim*10**-1.5)
         else:
             K_Jci.append(f.specimen.K_Jc_lim*10**-1.5)
-            K_Jc_lim.append(f.specimen.K_Jc_lim*10**-1.5)
+
+        K_Jc_lim.append(f.specimen.K_Jc_lim*10**-1.5)
 
     # Check if it is possible to compute the master curve
     if nbr_uncencored_data == 0:
+        print("ERROR: No K_Jc in acceptable limit. Impossible to compute master curve.")
         raise ValueError("ERROR: No K_Jc in acceptable limit. Impossible to compute master curve.")
 
     K_Jci = np.array(K_Jci)
@@ -47,19 +49,10 @@ def single_T_master_curve_analysis(fractures : list[Fracture], T : float):
 
     return K_Jc1T, K0, K_Jc_med, T_0Q, valid_T0Q, nbr_uncencored_data
 
-def plot_master_curve(T_0, K_Jc1T, T):
-    T_master_curve = np.linspace(T_0-100, T_0 + 100, 1000)
-    K_Jc_master_curve = 30 + 70*np.exp(0.019*(T_master_curve - T_0))
-    fig = plt.figure()
-    ax = fig.subplots()
-    ax.axvline(T_0, color="black", linestyle="--", label="$T_0$")
-    ax.plot(T_master_curve, K_Jc_master_curve, label="Master curve")
-    ax.plot(np.zeros_like(K_Jc1T)+T, K_Jc1T, label="$K_{Jc(1T)}$", linestyle=" ", marker="x")
-    ax.set_xlabel("$T$ [°C]")
-    ax.set_ylabel("$K_{Jc(med)}$")
-    ax.legend()
-
-    return fig, ax
+def master_curve_tolerance_bounds(T : float, T0 : float, percentile : float = 0.05):
+    K_Jc_percentile = 20.0 + (np.log(1.0/(1.0 - percentile)))**0.25 * (11.0 + 77.0*np.exp(0.019*(T-T0)))
+    T0_percentile = T - (1/0.019)*np.log((K_Jc_percentile - 30)/70)
+    return K_Jc_percentile, T0_percentile
 
 init_plt(latex=False, background_fig_color="white", background_axe_color="white")
 create_sns_palette("bright", "seaborn", True)
@@ -89,7 +82,8 @@ T = -120 # Temperature of the tests [°C]
 # -------------------------------
 path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
 
-list_test = [1, 3, 4, 6, 7, 8, 9, 10]
+list_test = [1, 3, 4, 6, 7, 8, 9, 10, 11, 12]
+#list_test = [13]
 test_name = ["sample", "_m120C.csv"]
 crack_name = ["EU97C", "_crack_length.xlsx"]
 report_name = ["report/test", ".txt"]
@@ -125,7 +119,7 @@ specimen_u = SpecimenDistribution(
     W = W,       # width [mm]
     W_u = 0.001,    # uncertainty in width [mm]
     S = S,      # span [mm] (4*W)
-    S_u = 0.005,    # uncertainty in span [mm]
+    S_u = 0.001,    # uncertainty in span [mm]
     B = B,       # thickness [mm]
     B_u = 0.001,    # uncertainty in thickness [mm]
     B_N = B_N,     # net thickness [mm]
@@ -146,7 +140,9 @@ ld_list = []
 legend_ld_list = []
 K_Jc_list = []
 K_Jc_lim_list = []
+K_Jc_err_list = []
 fractures = []
+fractures_mc = []
 
 # -------------------------------
 # Experimental
@@ -170,7 +166,13 @@ for test in file_names:
     elastic_region = elastic_region_determination_r2_max(ld, 10, False)
     ld, elastic_region = offset_LD_according_to_stiffness(ld, elastic_region)
 
-    fracture = Fracture(specimen, elastic_region, ld, id_computation)
+    fracture = Fracture(specimen, elastic_region, ld, id_computation, list_test[i])
+
+    rng = np.random.default_rng()
+    specimen_u.crack_profile_dist = crack_profile_distribution(crack_profile, 0.001, 0.001)
+    specimen_mc = specimen_u.sample(nbr_sample, rng)
+    elastic_mc = elastic_region_distribution(ld, elastic_region).sample(nbr_sample, rng)
+    mc = Fracture(specimen_mc, elastic_mc, ld, id_computation)
 
     #fracture.plot_details()
 
@@ -178,8 +180,11 @@ for test in file_names:
     legend_ld_list.append("Test " + str(list_test[i]) + " $K_{Jc}$ = " + "{:.0f}".format(fracture.K_Jc*10**-1.5))
     K_Jc_list.append(fracture.K_Jc*10**-1.5)
     K_Jc_lim_list.append(fracture.specimen.K_Jc_lim*10**-1.5)
+    K_Jc_err = compute_uncertainties(mc.K_Jc, 2.5)
+    K_Jc_err_list.append(K_Jc_err[2]*10**-1.5)
 
     fractures.append(fracture)
+    fractures_mc.append(mc)
 
     i += 1
 
@@ -200,70 +205,20 @@ elastic_region = elastic_region_determination_r2_method(ld, 3, 0.999, False)
 fracture = Fracture(specimen, elastic_region, ld, id_computation)
 #fracture.plot_details()
 
-#ld_list.append(ld)
-#legend_ld_list.append("Abaqus " + str(list_abaqus[0]) + " $K_{Jc}$ = " + "{:.0f}".format(fracture.K_Jc*10**-1.5))
-#K_Jc_list.append(fracture.K_Jc*10**-1.5)
-
 # -------------------------------
 # Analysis and plot of global results
 # -------------------------------
-fig, ax = plot_comparison_LD(ld_list, legend_ld_list)
-ax.plot(ld.disp, ld. load, color="black", linestyle = "-.", label="Abaqus $K_{Jc}$ = " + "{:.0f}".format(fracture.K_Jc*10**-1.5))
+mc = MasterCurve(fractures, T, 5, fractures_mc)
+mc.plot_master_curve(True)
+mc.plot_list_K(fracture)
+fig, ax = mc.plot_ld_curves()
+ax.plot(fracture.ld.disp, fracture.ld.load, color="black", linestyle="-.", label="Abaqus")
 ax.legend()
 
-K_Jc_lim = np.array(K_Jc_lim_list)
-K_Jci = np.array(K_Jc_list)
-K_Jc_mean = np.mean(K_Jci)
-K_Jc_std = np.std(K_Jci)
-
-bar_color = []
-for i in range(len(K_Jci)):
-    if K_Jci[i] < K_Jc_lim[i]:
-        bar_color.append("lightgreen")
-    else:
-        bar_color.append("salmon")
-
-bar_label = []
-for i in list_test:
-    bar_label.append("Test " + str(i))
-#for i in list_abaqus:
-#    bar_label.append("Abaqus " + i)
-fig = plt.figure()
-ax = fig.subplots()
-p = ax.bar(bar_label, np.array(K_Jc_list), edgecolor = "black", color=bar_color, label="$K_{Jc}$ Tests")
-p2 = ax.bar("Abaqus", fracture.K_Jc*10**-1.5, edgecolor = "black", color="skyblue", label="$K_{Jc}$ Abaqus")
-ax.bar_label(p, label_type='center')
-ax.bar_label(p2, label_type='center')
-ax.axhline(K_Jc_mean, label="$K_{Jc}$ mean = "+"{:.0f}".format(K_Jc_mean), color="red", linestyle="--")
-ax.axhline(K_Jc_mean + K_Jc_std, color="black", linestyle="-.", label="$K_{Jc}$ std = "+"{:.0f}".format(K_Jc_std))
-ax.axhline(K_Jc_mean - K_Jc_std, color="black", linestyle="-.")
-ax.set_ylabel("$K_{Jc}$ [MPa m$^{0.5}$]")
-ax.legend()
-
-# -------------------------------
-# Single Temperature Analysis
-# -------------------------------
-print("="*60)
-print(" Single Temperature Analysis")
-print("="*60)
-
-K_Jc1T, K0, K_Jc_med, T_0Q, valid_T0Q, nbr_uncencored_data = single_T_master_curve_analysis(fractures, T)
-
-# Plot master curve
-plot_master_curve(T_0Q, K_Jc1T, T)
-
-if valid_T0Q:
-    valid_T0Q_message = "Valid temperature"
-else:
-    valid_T0Q_message = "Unvalid temperature"
-
-print(f" K0 = {K0:.3f} MPa m^0.5")
-print(f" K_Jc_med = {K_Jc_med:.3f} MPa m^0.5")
-print(f" T0 = {T_0Q:.3f} °C, " + valid_T0Q_message)
-print(f" Number of uncensored data: {nbr_uncencored_data}")
-print(f" Number of data: {len(fractures)}")
-
-
+logger = Logger("txt", "report/MasterCurve.txt")
+#log_master_curve(mc, logger, True)
+log_specimen(specimen, logger)
+log_specimen_uncertainties(specimen, specimen_u.sample(nbr_sample, rng), logger)
 
 
 print("="*60)

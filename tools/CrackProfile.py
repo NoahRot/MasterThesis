@@ -64,6 +64,21 @@ class CrackProfile(object):
         """
         return 0.125*(0.5*(self.a_i[0] + self.a_i[-1]) + np.sum(self.a_i[1:-1], axis=0))
     
+    def is_sample(self) -> bool:
+        """
+        Check if the instance is a sample
+
+        Returns
+        -------
+        bool
+            True if the instance is a sample, False otherwise
+        """
+        
+        shape_a = self.a_i.shape
+        shape_l = self.l_i.shape
+
+        return len(shape_a) == 2 or len(shape_l) == 2
+    
 class CrackProfileDistribution(object):
     """
     Statistical distribution of the crack profile parameters

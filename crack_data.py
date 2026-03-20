@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tools.plt_spec import *
+from tools.reader import monitoring_file_reader
 
 def read_crack_data(test_path : str):
     # open the file 
@@ -30,6 +31,9 @@ create_sns_palette()
 
 path = "../data/fatigue_precracking/Test 3"
 
+monitoring_file_reader(path + "/monitoringfile.txt")
+
+"""
 data, header = read_crack_data(path)
 print(header)
 print(data)
@@ -49,5 +53,5 @@ bx.plot(data["Step"], data["M_P-P"], 'kx--')
 bx.set_ylabel("$M_{P-P}$")
 
 ax.legend(["$a_{max}$", "$a_{min}$"])
-
+"""
 plt.show()

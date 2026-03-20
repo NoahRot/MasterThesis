@@ -20,6 +20,9 @@ Date
 import numpy as np
 from typing import Union
 from tools.CrackProfile import *
+from tools.Logger import Logger
+from tools.MonteCarlo import compute_uncertainties
+from tools.GeometricFunction import geometric_fnc_K
 
 class Specimen(object):
     """
@@ -86,6 +89,24 @@ class Specimen(object):
         self.E = E
         self.E_plain_strain = E/(1 - self.nu**2)
         self.K_Jc_lim = np.sqrt(self.E*self.b0*self.sigma_YS/(30*(1-self.nu**2)))
+
+    def is_sample(self) -> bool:
+        """
+        Check if the instance is a sample
+
+        Returns
+        -------
+        bool
+            True if the instance is a sample, False otherwise
+        """
+        
+        return  isinstance(self.W, np.ndarray) or \
+                isinstance(self.S, np.ndarray) or \
+                isinstance(self.B, np.ndarray) or \
+                isinstance(self.B_N, np.ndarray) or \
+                isinstance(self.a0, np.ndarray) or \
+                isinstance(self.E, np.ndarray) or \
+                isinstance(self.sigma_YS, np.ndarray)
 
 class SpecimenDistribution(object):
     """
@@ -202,3 +223,114 @@ class SpecimenDistribution(object):
         sigma_YS_sample = rng.normal(self.sigma_YS, self.sigma_YS_u, nbr_samples)
 
         return Specimen(W_sampled, S_sampled, B_sampled, B_N_sampled, a0_sampled, self.nu, E_sampled, self.eta_pl, sigma_YS_sample)
+    
+def compare_specimen(s1 : Specimen, s2 : Specimen) -> bool:
+    """
+    Compare two  specimen to check that they are similar
+
+    Parameters
+    ----------
+    s1 : Specimen
+        First specimen
+    s2 : Specimen
+        Second specimen
+
+    Returns
+    -------
+    bool
+        True if they are similar, False otherwise
+
+    Warnings
+    --------
+    The initial crack length are different for each specimen and
+    thus are not compared in this function.
+    """
+    return  s1.W ==         s2.W and \
+            s1.S ==         s2.S and \
+            s1.B ==         s2.B and \
+            s1.B_N ==       s2.B_N and \
+            s1.eta_pl ==    s2.eta_pl and \
+            s1.sigma_YS ==  s2.sigma_YS and \
+            s1.nu ==        s2.nu and \
+            s1.E ==         s2.E
+
+def log_specimen(specimen : Specimen, logger : Logger):
+    """
+    Log the specimen data
+
+    Parameters
+    ----------
+    specimen : Specimen
+        The specimen
+    logger : Logger
+        The logger
+    """
+    # Check that the specimen is not a sample
+    if specimen.is_sample():
+        print("ERROR: Can not log data from a sample specimen")
+        raise ValueError("ERROR: Can not log data from a sample specimen")
+
+    # -------------------------
+    # Specimen geometry
+    # -------------------------
+    logger.log("\n--- Specimen geometry ---")
+    logger.log(f" W       = {specimen.W:.3e} mm (specimen width)")
+    logger.log(f" S       = {specimen.S:.3e} mm (span)")
+    logger.log(f" B       = {specimen.B:.3e} mm (thickness)")
+    logger.log(f" B_N     = {specimen.B_N:.3e} mm (net thickness)")
+    logger.log(f" a0      = {specimen.a0:.3e} mm (initial crack length)")
+    logger.log(f" b0      = {specimen.b0:.3e} mm (remaining ligament)")
+    logger.log(f" f(a0/W) = {geometric_fnc_K(specimen.a0, specimen.W):.3e} (-) (geometric function)")
+    logger.log(f" eta_pl  = {specimen.eta_pl:.3f} (-)")
+
+    # -------------------------
+    # Material properties
+    # -------------------------
+    logger.log("\n--- Material properties ---")
+    logger.log(f" E        = {specimen.E:.3f} MPa (Young modulus)")
+    logger.log(f" E'       = {specimen.E_plain_strain:.3f} MPa (Effective modulus in plain strain)")
+    logger.log(f" nu       = {specimen.nu:.3f} (-) (Poisson ratio)")
+    logger.log(f" K_Jc lim = {specimen.K_Jc_lim*10**-1.5:.6e} MPa·√m (Maximum K_Jc)")
+
+def log_specimen_uncertainties(specimen : Specimen, specimen_mc : Specimen, logger : Logger):
+    """
+    Log the specimen data with the uncertainties
+
+    Parameters
+    ----------
+    specimen : Specimen
+        The specimen
+    specimen_mc : Specimen
+        A specimen sample
+    logger : Logger
+        The logger
+    """
+    # Check that the specimen is not a sample and that specimen_mc is a sample
+    if specimen.is_sample():
+        print("ERROR: Can not log data from a sample specimen")
+        raise ValueError("ERROR: Can not log data from a sample specimen")
+    if not specimen_mc.is_sample():
+        print("ERROR: Can not log uncertainties from a non sample specimen")
+        raise ValueError("ERROR: Can not log uncertainties from a non sample specimen")
+    
+    # -------------------------
+    # Specimen geometry
+    # -------------------------
+    logger.log("\n--- Specimen geometry ---")
+    logger.log(f" W       = {specimen.W:.3e} ± {compute_uncertainties(specimen_mc.W)[2]:.3e} mm (specimen width)")
+    logger.log(f" S       = {specimen.S:.3e} ± {compute_uncertainties(specimen_mc.S)[2]:.3e} mm (span)")
+    logger.log(f" B       = {specimen.B:.3e} ± {compute_uncertainties(specimen_mc.B)[2]:.3e} mm (thickness)")
+    logger.log(f" B_N     = {specimen.B_N:.3e} ± {compute_uncertainties(specimen_mc.B_N)[2]:.3e} mm (net thickness)")
+    logger.log(f" a0      = {specimen.a0:.3e} ± {compute_uncertainties(specimen_mc.a0)[2]:.3e} mm (initial crack length)")
+    logger.log(f" b0      = {specimen.b0:.3e} ± {compute_uncertainties(specimen_mc.b0)[2]:.3e} mm (remaining ligament)")
+    logger.log(f" f(a0/W) = {geometric_fnc_K(specimen.a0, specimen.W):.3e} ± {compute_uncertainties(geometric_fnc_K(specimen_mc.a0, specimen_mc.W))[2]:.3e} (-) (geometric function)")
+    logger.log(f" eta_pl  = {specimen.eta_pl:.3f} (-)")
+
+    # -------------------------
+    # Material properties
+    # -------------------------
+    logger.log("\n--- Material properties ---")
+    logger.log(f" E        = {specimen.E:.3f} ± {compute_uncertainties(specimen_mc.E)[2]:.3f} MPa (Young modulus)")
+    logger.log(f" E'       = {specimen.E_plain_strain:.3f} ± {compute_uncertainties(specimen_mc.E_plain_strain)[2]:.3f} MPa (Effective modulus in plain strain)")
+    logger.log(f" nu       = {specimen.nu:.3f} (-) (Poisson ratio)")
+    logger.log(f" K_Jc lim = {specimen.K_Jc_lim*10**-1.5:.6e} ± {compute_uncertainties(specimen_mc.K_Jc_lim*10**-1.5)[2]:.6e} MPa·√m (Maximum K_Jc)")

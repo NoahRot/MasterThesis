@@ -28,6 +28,7 @@ Date
 
 from tools.LoadDisplacement import *
 import scipy as sci
+from tools.Logger import Logger
 
 class ElasticRegion(object):
     """
@@ -47,6 +48,19 @@ class ElasticRegion(object):
         self.id_end = id_end
         self.stiffness = stiffness
         self.intercept = intercept
+
+    def is_sample(self) -> bool:
+        """
+        Check if the instance is a sample
+
+        Returns
+        -------
+        bool
+            True if the instance is a sample, False otherwise
+        """
+        
+        return  isinstance(self.stiffness, np.ndarray) or \
+                isinstance(self.intercept, np.ndarray)
 
 class ElasticRegionDistribution(object):
     """
