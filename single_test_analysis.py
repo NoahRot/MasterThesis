@@ -44,7 +44,7 @@ if len(sys.argv) > 1:
 # Path to files
 # -------------------------------
 path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
-path = "data_test"
+#path = "data_test"
 test_name = ["sample", "_m120C.csv"]
 crack_name = ["EU97C", "_crack_length.xlsx"]
 report_name = ["report/test", ".txt"]

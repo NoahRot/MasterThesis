@@ -1,4 +1,4 @@
-from tools.Fracture import Fracture, log_fracture
+from tools.Fracture import Fracture, log_fracture, log_fracture_uncertainties
 from tools.Specimen import compare_specimen
 from tools.MonteCarlo import compute_uncertainties
 from tools.Logger import Logger
@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 from typing import Union
 
 def single_T_master_curve_analysis(fractures : list[Fracture], T : float, B : float):
+    """
+    Analysis of the master curve using experimental data from one single temperature.
+    """
     K_min = 20
     Bx = 25.4
     nbr_uncencored_data = 0
@@ -55,7 +58,7 @@ def master_curve_tolerance_bounds(T : float, T0 : float, percentile : float = 0.
     return K_Jc_percentile/10**-1.5, T0_percentile
 
 class MasterCurve(object):
-    def __init__(self, fractures : list[Fracture], T:float, percentile:float, fractures_mc : list[Fracture] = None):
+    def __init__(self, fractures : list[Fracture], T:float, percentile:float, fractures_mc : list[Fracture]):
         # Check that the fractures are not sampled and check that all specimen are similar
         specimen = None
         K_Jc_err_list = []
@@ -76,8 +79,13 @@ class MasterCurve(object):
                 raise ValueError("ERROR: fractures_mc must be composed of sampled values")
             
             K_Jc_err_list.append(compute_uncertainties(f.K_Jc, percentile)[2])
+
+        if len(fractures) != len(fractures_mc):
+            print("ERROR: Must have the same number of fracture and fracture with Monte-Carlo")
+            raise ValueError("ERROR: Must have the same number of fracture and fracture with Monte-Carlo")
             
         self.fractures = fractures
+        self.fractures_mc = fractures_mc
         self.T = T
         self.percentile = percentile
         self.K_Jc_err = np.array(K_Jc_err_list)
@@ -85,7 +93,10 @@ class MasterCurve(object):
         self.K_Jc_med_low, self.T0_low = master_curve_tolerance_bounds(self.T, self.T0, self.percentile/100)
         self.K_Jc_med_high, self.T0_high = master_curve_tolerance_bounds(self.T, self.T0, (100-self.percentile)/100)
         if not self.valid_T0:
-            print("WARNING: The temperature computed for the MC is invalid")
+            print(f"WARNING: The temperature computed for the MC is invalid. T = {self.T:.2f} °C, T0 = {self.T0:.2f} °C. Delta T = {np.abs(self.T-self.T0):.2f} °C")
+
+    def has_monte_carlo(self):
+        return self.fractures_mc is not None
 
     def plot_ld_curves(self):
         fig = plt.figure()
@@ -123,7 +134,7 @@ class MasterCurve(object):
         if simulation_fracture is not None:
             ax.bar_label(p2, label_type='center', rotation=90)
         ax.tick_params(axis='x', rotation=90)
-        ax.set_ylabel("$K_{Jc}$ [MPa m$^{0.5}$]")
+        ax.set_ylabel("$K_{Jc}$ [MPa $\sqrt{\\text{m}}$]")
         return fig, ax
 
     def plot_master_curve(self, show_tolerance = False, show_errorbar = False):
@@ -197,5 +208,58 @@ def log_master_curve(mc : MasterCurve, logger : Logger, with_fracture : bool = F
     else:
         logger.log(f" Valid T0 = False")
     logger.log(f" K_Jc(med) = {mc.K_Jc_med*10**-1.5:.6e}, CI[{mc.K_Jc_med_low*10**-1.5:.3f}, {mc.K_Jc_med_high*10**-1.5:.3f}] MPa·√m")
+
+    logger.log("="*60)
+
+def log_master_curve_uncertainties(mc : MasterCurve, logger : Logger, with_fracture : bool = False):
+    if not mc.has_monte_carlo():
+        print("ERROR: Can not log Master Curve uncertainties without Master curve instance having Monte Carlo simulations")
+        raise ValueError("ERROR: Can not log Master Curve uncertainties without Master curve instance having Monte Carlo simulations")
+
+    logger.log("="*60)
+    logger.log("Results for Master Curve")
+    logger.log("="*60)
+
+    # -------------------------
+    # General info on the fracture tests
+    # -------------------------
+    logger.log("\n--- General fracture tests ---")
+    logger.log(" Tests number:")
+    for f in mc.fractures:
+        info = "  > "
+        if f.test_nbr is None:
+            info += "Test ??"
+        else:
+            info += "Test " + str(f.test_nbr)
+        if f.specimen.K_Jc_lim < f.K_Jc:
+            info += " Censored"
+        else:
+            info += " Uncensored"
+        logger.log(info)
+    logger.log(f" Number of tests = {len(mc.fractures)}")
+    logger.log(f" Number of uncensored = {mc.nbr_uncencored_data}")
+
+    # -------------------------
+    # Fracture details (in requiered)
+    # -------------------------
+    if with_fracture:
+        for i in range(len(mc.fractures)):
+            log_fracture_uncertainties(mc.fractures[i], mc.fractures_mc[i], logger)
+
+    # -------------------------
+    # Master curve infos
+    # -------------------------
+    logger.log("="*60)
+    logger.log("Master curve")
+    logger.log("="*60)
+
+    logger.log(f" T = {mc.T:.3f} °C")
+    logger.log(f" Confidence interval = {100-2*mc.percentile}%")
+    logger.log(f" T0 = {mc.T0:.3f}, CI[{mc.T0_low:.3f}, {mc.T0_high:.3f}] °C")
+    if mc.valid_T0:
+        logger.log(f" Valid T0 = True")
+    else:
+        logger.log(f" Valid T0 = False")
+    logger.log(f" K_Jc(med) = {mc.K_Jc_med*10**-1.5:.3f}, CI[{mc.K_Jc_med_low*10**-1.5:.3f}, {mc.K_Jc_med_high*10**-1.5:.3f}] MPa·√m")
 
     logger.log("="*60)
