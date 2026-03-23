@@ -128,7 +128,7 @@ def A_plastic(ld : LoadDisplacement, stiffness : Union[float, np.ndarray], id_co
         The plastic area [N mm]
     """
     # Compute total area under curve
-    A_pl1 = np.trapezoid(ld.load[:id_computation], ld.disp[:id_computation])
+    A_pl1 = np.trapz(ld.load[:id_computation], ld.disp[:id_computation])
 
     # Add the part before the beginning of LD curve if requiered
     if conditional_area:
@@ -277,7 +277,7 @@ class Fracture(object):
 
         return fig, ax
 
-def log_fracture_data(fracture : Fracture, logger : Logger):
+def log_fracture(fracture : Fracture, logger : Logger):
     """
     Log all the data related to the fracture
 
@@ -300,54 +300,102 @@ def log_fracture_data(fracture : Fracture, logger : Logger):
     logger.log("="*60)
 
     # -------------------------
-    # Specimen geometry
+    # Specimen
     # -------------------------
-    logger.log("\n--- Specimen geometry ---")
-    logger.log(f" W       = {fracture.specimen.W:.3e} mm (specimen width)")
-    logger.log(f" S       = {fracture.specimen.S:.3e} mm (span)")
-    logger.log(f" B       = {fracture.specimen.B:.3e} mm (thickness)")
-    logger.log(f" B_N     = {fracture.specimen.B_N:.3e} mm (net thickness)")
-    logger.log(f" a0      = {fracture.specimen.a0:.3e} mm (initial crack length)")
-    logger.log(f" b0      = {fracture.specimen.b0:.3e} mm (remaining ligament)")
-    logger.log(f" f(a0/W) = {geometric_fnc_K(fracture.specimen.a0, fracture.specimen.W):.3e} (-) (geometric function)")
-    logger.log(f" eta_pl  = {fracture.specimen.eta_pl:.3f} (-)")
-
-    # -------------------------
-    # Material properties
-    # -------------------------
-    logger.log("\n--- Material properties ---")
-    logger.log(f" E      = {fracture.specimen.E:.3f} MPa (Young modulus)")
-    logger.log(f" E'     = {fracture.specimen.E_plain_strain:.3f} MPa (Effective modulus in plain strain)")
-    logger.log(f" nu     = {fracture.specimen.nu:.3f} (-) (Poisson ratio)")
-    logger.log(f" K_Jc lim = {fracture.specimen.K_Jc_lim:.3f} MPa mm^0.5, {fracture.specimen.K_Jc_lim*np.sqrt(1e-3):.3f} MPa m^0.5 (Maximum K_Jc)")
+    log_specimen(fracture.specimen, logger)
 
     # -------------------------
     # Elastic region detection
     # -------------------------
-    logger.log("\n--- Elastic region detection ---")
-    logger.log(f" Yield load         = {fracture.ld.load[fracture.elastic.id_end]} N")
-    logger.log(f" Yield displacement = {fracture.ld.disp[fracture.elastic.id_end]} mm")
-    logger.log(f" Elastic end index  = {fracture.elastic.id_end}")
-    logger.log(f" Stiffness (slope)  = {fracture.elastic.stiffness:.6e} N/mm")
-    logger.log(f" Intercept 1        = {fracture.elastic.intercept:.6e} (Interception of y-axis for elastic region)")
+    log_elastic_region(fracture.elastic, logger)
     logger.log(f" Intercept 2        = {fracture.intercept_2:.6e} (Interception of y-axis for computation point)")
-    logger.log(f" A plastic          = {fracture.A_pl:.6e} (plastic area)")
+    logger.log(f" Yield load         = {fracture.ld.load[fracture.elastic.id_end]:.6f} N")
+    logger.log(f" Yield displacement = {fracture.ld.disp[fracture.elastic.id_end]:.6f} mm")
+    logger.log(f" A plastic          = {fracture.A_pl:.6e} N·mm (plastic area)")
 
     # -------------------------
     # Load at computation point
     # -------------------------
     logger.log("\n--- Computation point ---")
-    logger.log(f" Index used        = {fracture.id_computation}")
-    logger.log(f" Load P            = {fracture.ld.load[fracture.id_computation]:.6e} N")
+    logger.log(f" Index used   = {fracture.id_computation}")
+    logger.log(f" Load P       = {fracture.ld.load[fracture.id_computation]:.6e} N")
+    logger.log(f" Displacement = {fracture.ld.disp[fracture.id_computation]:.6e} mm")
 
     # -------------------------
     # Fracture parameters
     # -------------------------
     logger.log("\n--- Fracture parameters ---")
-    logger.log(f" J_el   = {fracture.J_el:.6e} MPa mm, {fracture.J_el*1e-3:.6e} MPa m")
-    logger.log(f" J_pl   = {fracture.J_pl:.6e} MPa mm, {fracture.J_pl*1e-3:.6e} MPa m")
-    logger.log(f" J_c    = {fracture.J_c:.6e} MPa mm, {fracture.J_c*1e-3:.6e}  MPa m")
-    logger.log(f" K_el   = {fracture.K_el:.6e} MPa mm^0.5, {fracture.K_el*np.sqrt(1e-3):.6e} MPa m^0.5")
-    logger.log(f" K_Jc   = {fracture.K_Jc:.6e} MPa mm^0.5, {fracture.K_Jc*np.sqrt(1e-3):.6e} MPa m^0.5")
+    logger.log(f" J_el = {fracture.J_el*1e-3:.6e} MPa·m")
+    logger.log(f" J_pl = {fracture.J_pl*1e-3:.6e} MPa·m")
+    logger.log(f" J_c  = {fracture.J_c*1e-3:.6e} MPa·m")
+    logger.log(f" K_el = {fracture.K_el*np.sqrt(1e-3):.6e} MPa·√m")
+    logger.log(f" K_Jc = {fracture.K_Jc*np.sqrt(1e-3):.6e} MPa·√m")
+    if fracture.K_Jc < fracture.specimen.K_Jc_lim:
+        logger.log(f" Uncensored value of K_Jc")
+    else:
+        logger.log(f" Censored value of K_Jc")
+
+    logger.log("\n" + "="*60)
+
+def log_fracture_uncertainties(fracture : Fracture, fracture_mc : Fracture, logger : Logger):
+    """
+    Log all the data related to the fracture
+
+    Parameters
+    ----------
+    logger : Logger
+        Logger to log the data
+    """
+
+    # Check if the fracture is no sampled
+    if fracture.is_sample:
+        print("ERROR: Can not log fracture data from a sampled fracture.")
+        raise ValueError("ERROR: Can not log fracture data from a sampled fracture.")
+    if not fracture_mc.is_sample:
+        print("ERROR: Can not log uncertainties from a non sample fracture")
+        raise ValueError("ERROR: Can not log uncertainties from a non sample fracture")
 
     logger.log("="*60)
+    if fracture.test_nbr is None:
+        logger.log("Results for fracture")
+    else:
+        logger.log("Results for fracture. Test " + str(fracture.test_nbr))
+    logger.log("="*60)
+
+    # -------------------------
+    # Specimen
+    # -------------------------
+    log_specimen_uncertainties(fracture.specimen, fracture_mc.specimen, logger)
+
+    # -------------------------
+    # Elastic region detection
+    # -------------------------
+    log_elastic_region_uncertainties(fracture.elastic, fracture_mc.elastic, logger)
+    logger.log(f" Intercept 2        = {fracture.intercept_2:.6e} ± {compute_uncertainties(fracture_mc.intercept_2)[2]:.6e} (Interception of y-axis for computation point)")
+    logger.log(f" Yield load         = {fracture.ld.load[fracture.elastic.id_end]:.6f} N")
+    logger.log(f" Yield displacement = {fracture.ld.disp[fracture.elastic.id_end]:.6f} mm")
+    logger.log(f" A plastic          = {fracture.A_pl:.6e} ± {compute_uncertainties(fracture_mc.A_pl)[2]:.6e} N·mm (plastic area)")
+
+    # -------------------------
+    # Load at computation point
+    # -------------------------
+    logger.log("\n--- Computation point ---")
+    logger.log(f" Index used   = {fracture.id_computation}")
+    logger.log(f" Load P       = {fracture.ld.load[fracture.id_computation]:.6e} N")
+    logger.log(f" Displacement = {fracture.ld.disp[fracture.id_computation]:.6e} mm")
+
+    # -------------------------
+    # Fracture parameters
+    # -------------------------
+    logger.log("\n--- Fracture parameters ---")
+    logger.log(f" J_el = {fracture.J_el*1e-3:.6e} ± {compute_uncertainties(fracture_mc.J_el)[2]*1e-3:.6e} MPa·m")
+    logger.log(f" J_pl = {fracture.J_pl*1e-3:.6e} ± {compute_uncertainties(fracture_mc.J_pl)[2]*1e-3:.6e} MPa·m")
+    logger.log(f" J_c  = {fracture.J_c*1e-3:.6e} ± {compute_uncertainties(fracture_mc.J_c)[2]*1e-3:.6e} MPa·m")
+    logger.log(f" K_el = {fracture.K_el*np.sqrt(1e-3):.6e} ± {compute_uncertainties(fracture_mc.K_el)[2]*np.sqrt(1e-3):.6e} MPa·√m")
+    logger.log(f" K_Jc = {fracture.K_Jc*np.sqrt(1e-3):.6e} ± {compute_uncertainties(fracture_mc.K_Jc)[2]*np.sqrt(1e-3):.6e} MPa·√m")
+    if fracture.K_Jc < fracture.specimen.K_Jc_lim:
+        logger.log(f" Uncensored value of K_Jc")
+    else:
+        logger.log(f" Censored value of K_Jc")
+
+    logger.log("\n" + "="*60)

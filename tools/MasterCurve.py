@@ -1,4 +1,4 @@
-from tools.Fracture import Fracture, log_fracture_data
+from tools.Fracture import Fracture, log_fracture
 from tools.Specimen import compare_specimen
 from tools.MonteCarlo import compute_uncertainties
 from tools.Logger import Logger
@@ -82,8 +82,8 @@ class MasterCurve(object):
         self.percentile = percentile
         self.K_Jc_err = np.array(K_Jc_err_list)
         self.K_Jci, self.K_Jc_lim, self.K_Jc1T, self.K0, self.K_Jc_med, self.T0, self.valid_T0, self.nbr_uncencored_data = single_T_master_curve_analysis(self.fractures, self.T, specimen.B)
-        self.T0_low = master_curve_tolerance_bounds(self.T, self.T0, self.percentile/100)[1]
-        self.T0_high = master_curve_tolerance_bounds(self.T, self.T0, (100-self.percentile)/100)[1]
+        self.K_Jc_med_low, self.T0_low = master_curve_tolerance_bounds(self.T, self.T0, self.percentile/100)
+        self.K_Jc_med_high, self.T0_high = master_curve_tolerance_bounds(self.T, self.T0, (100-self.percentile)/100)
         if not self.valid_T0:
             print("WARNING: The temperature computed for the MC is invalid")
 
@@ -180,7 +180,7 @@ def log_master_curve(mc : MasterCurve, logger : Logger, with_fracture : bool = F
     # -------------------------
     if with_fracture:
         for f in mc.fractures:
-            log_fracture_data(f, logger)
+            log_fracture(f, logger)
 
     # -------------------------
     # Master curve infos
@@ -190,12 +190,12 @@ def log_master_curve(mc : MasterCurve, logger : Logger, with_fracture : bool = F
     logger.log("="*60)
 
     logger.log(f" T = {mc.T:.3f} °C")
-    logger.log(f" Confidence interval = {2*mc.percentile}%")
+    logger.log(f" Confidence interval = {100-2*mc.percentile}%")
     logger.log(f" T0 = {mc.T0:.3f}, CI[{mc.T0_low:.3f}, {mc.T0_high:.3f}] °C")
     if mc.valid_T0:
         logger.log(f" Valid T0 = True")
     else:
         logger.log(f" Valid T0 = False")
-    logger.log(f" K_Jc(med) = {mc.K_Jc_med*10**-1.5:.6e} MPa·√m")
+    logger.log(f" K_Jc(med) = {mc.K_Jc_med*10**-1.5:.6e}, CI[{mc.K_Jc_med_low*10**-1.5:.3f}, {mc.K_Jc_med_high*10**-1.5:.3f}] MPa·√m")
 
     logger.log("="*60)

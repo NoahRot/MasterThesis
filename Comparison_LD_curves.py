@@ -81,8 +81,9 @@ T = -120 # Temperature of the tests [°C]
 # Path to files
 # -------------------------------
 path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
+path = "data_test"
 
-list_test = [1, 3, 4, 6, 7, 8, 9, 10, 11, 12]
+list_test = [1, 3, 4, 6, 7]#, 8, 9, 10, 11, 12]
 #list_test = [13]
 test_name = ["sample", "_m120C.csv"]
 crack_name = ["EU97C", "_crack_length.xlsx"]
@@ -199,7 +200,8 @@ print("="*60)
 # Load data, treat and compute SIF and J-integral
 # -------------------------------
 print("Analysis of fracture")
-ld = abaqus_LD_reader(path_abaqus + "charpy_" + list_abaqus[0] + "micron_L=1500micron_R=2mm\\load_disp.rpt")
+#ld = abaqus_LD_reader(path_abaqus + "charpy_" + list_abaqus[0] + "micron_L=1500micron_R=2mm\\load_disp.rpt")
+ld = abaqus_LD_reader("data_test\\load_disp.rpt")
 elastic_region = elastic_region_determination_r2_method(ld, 3, 0.999, False)
 
 fracture = Fracture(specimen, elastic_region, ld, id_computation)
@@ -216,9 +218,7 @@ ax.plot(fracture.ld.disp, fracture.ld.load, color="black", linestyle="-.", label
 ax.legend()
 
 logger = Logger("txt", "report/MasterCurve.txt")
-#log_master_curve(mc, logger, True)
-log_specimen(specimen, logger)
-log_specimen_uncertainties(specimen, specimen_u.sample(nbr_sample, rng), logger)
+log_master_curve(mc, logger, True)
 
 
 print("="*60)

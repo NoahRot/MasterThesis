@@ -29,6 +29,7 @@ Date
 from tools.LoadDisplacement import *
 import scipy as sci
 from tools.Logger import Logger
+from tools.MonteCarlo import compute_uncertainties
 
 class ElasticRegion(object):
     """
@@ -289,3 +290,56 @@ def elastic_region_determination_r2_method(ld : LoadDisplacement, min_points : i
         ax.set_title("$R^2$ value evaluation - $(R^2)$ threshold method")
 
     return ElasticRegion(elastic_end, stiffness, intercept)
+
+def log_elastic_region(elastic : ElasticRegion, logger : Logger):
+    """
+    Log the elastic region data
+
+    Parameters
+    ----------
+    elastic : ElasticRegion
+        The Elastic region data
+    logger : Logger
+        The logger
+    """
+    # Check that the specimen is not a sample
+    if elastic.is_sample():
+        print("ERROR: Can not log data from a sample specimen")
+        raise ValueError("ERROR: Can not log data from a sample specimen")
+
+    # -------------------------
+    # Elastic region detection
+    # -------------------------
+    logger.log("\n--- Elastic region ---")
+    logger.log(f" Elastic end index  = {elastic.id_end} (Index of the end of the elastic region on the LD curve)")
+    logger.log(f" Stiffness (slope)  = {elastic.stiffness:.6e} N/mm (Stiffness of the elastic region)")
+    logger.log(f" Intercept 1        = {elastic.intercept:.6e} (Interception of y-axis for elastic region)")
+
+def log_elastic_region_uncertainties(elastic : ElasticRegion, elastic_mc : ElasticRegion, logger : Logger):
+    """
+    Log the elastic region data
+
+    Parameters
+    ----------
+    elastic : ElasticRegion
+        The Elastic region data
+    elastic_mc : Specimen
+        A specimen sample
+    logger : Logger
+        The logger
+    """
+    # Check that the specimen is not a sample and that specimen_mc is a sample
+    if elastic.is_sample():
+        print("ERROR: Can not log data from a sample elastic region")
+        raise ValueError("ERROR: Can not log data from a sample elastic region")
+    if not elastic_mc.is_sample():
+        print("ERROR: Can not log uncertainties from a non sample elastic region")
+        raise ValueError("ERROR: Can not log uncertainties from a non sample elastic region")
+
+    # -------------------------
+    # Elastic region detection
+    # -------------------------
+    logger.log("\n--- Elastic region ---")
+    logger.log(f" Elastic end index  = {elastic.id_end} (Index of the end of the elastic region on the LD curve)")
+    logger.log(f" Stiffness (slope)  = {elastic.stiffness:.6e} ± {compute_uncertainties(elastic_mc.stiffness)[2]:.6e} N/mm (Stiffness of the elastic region)")
+    logger.log(f" Intercept 1        = {elastic.intercept:.6e} ± {compute_uncertainties(elastic_mc.intercept)[2]:.6e} (Interception of y-axis for elastic region)")
