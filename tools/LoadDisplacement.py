@@ -226,7 +226,7 @@ def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int =
 
     # Check the end index with the force
     for i in range(begin_index, end_index):
-        if ld.load[i+1] < 0.8*ld.load[i]:
+        if ld.load[i+1] < 0.8*ld.load[i] and ld.load[i] > np.max(ld.load)*0.7:
             end_index = i
             break
 
