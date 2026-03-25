@@ -34,6 +34,8 @@ k_r = 1e-4  # [m^4/mol/s] recombination coefficient (tune this)
 
 print_freq = 100 #Frequency at which the program show the progression
 
+save_folder = "save/"
+
 # ============================================================
 # Computed values
 # ============================================================
@@ -105,6 +107,7 @@ while t < t_final:
     # Print progress
     if iter%print_freq == 0:
         print(f"t={t}, t_final={t_final}")
+        np.save(save_folder + "concentration_i=" + str(iter), C)
 
     # Compute values
     D_dt_dL2 = D1*dt*dL**-2
@@ -151,7 +154,7 @@ while t < t_final:
 
     Cs_z[1:-1, 1:-1] += dt * (J_gen_z - J_in_z - k_r * Cs_z[1:-1, 1:-1]**2)
 
-    # --- Prevent negative values (important for stability)
+    # Avoid negative (stability) 
     Cs_x = np.maximum(Cs_x, 0)
     Cs_y = np.maximum(Cs_y, 0)
     Cs_z = np.maximum(Cs_z, 0)
@@ -202,6 +205,7 @@ plt.colorbar(im, label="Concentration [mol/mm³]")
 ax.set_title(f"Slice at z = {k_mid*dL*1000:.2f} mm")
 ax.set_xlabel("x")
 ax.set_ylabel("y")
+ax.grid()
 
 i_mid = dim[0] // 2
 j_mid = dim[1] // 2
