@@ -33,12 +33,26 @@ nbr_sample = 100000
 
 T = -120 # Temperature of the tests [°C]
 test_number = 4
+begin = -1
+end = -1
 
 if len(sys.argv) > 1:
     try:
         test_number =  int(sys.argv[1])
     except:
-        print("WARNING: Can not get the argument")
+        print("WARNING: Can not get the index of the test as an argument. It can not be converted into 'int'")
+
+if len(sys.argv) > 2:
+    try:
+        begin =  int(sys.argv[2])
+    except:
+        print("WARNING: Can not get the argument for the beginning. It can not be converted into 'int'")
+
+if len(sys.argv) > 3:
+    try:
+        end =  int(sys.argv[3])
+    except:
+        print("WARNING: Can not get the argument for the beginning. It can not be converted into 'int'")
 
 # -------------------------------
 # Path to files
@@ -97,7 +111,10 @@ ld = experiment_LD_reader(ld_path)
 crack_profile = crack_profile_reader(crack_path)
 specimen = Specimen(W, S, B, B_N, crack_profile.initial_crack_length(), nu, E, eta_pl, sigma_YS)
 
-ld = experimental_LD_treatment(ld, 5, True)
+fig = plt.figure()
+ax = fig.subplots()
+ax.plot(ld.load)
+ld = experimental_LD_treatment(ld, 5, begin, end, True)
 elastic_region = elastic_region_determination_r2_max(ld, 10, True)
 ld, elastic_region = offset_LD_according_to_stiffness(ld, elastic_region)
 

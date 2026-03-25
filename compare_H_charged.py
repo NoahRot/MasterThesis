@@ -7,6 +7,7 @@ from tools.ElasticRegion import *
 from tools.Fracture import *
 from tools.MonteCarlo import *
 from tools.MasterCurve import *
+from tools.TreatementOverwrite import treatement_overwrite
 import os
 
 init_plt(latex=False, background_fig_color="white", background_axe_color="white")
@@ -42,7 +43,7 @@ path = "C:\\Users\\rotunn_n\\Documents\\PDM\\data\\3_points_bending"
 #path = "data_test"
 
 list_test = [1, 3, 4, 6, 7, 8, 9, 10, 11, 12] # Path for the non Hydrogen charged samples
-list_test_H = [13, 14] # Path for the Hydrogen charged samples
+list_test_H = [13, 14, 15, 16] # Path for the Hydrogen charged samples
 test_name = ["sample", "_m120C.csv"]
 crack_name = ["EU97C", "_crack_length.xlsx"]
 
@@ -104,7 +105,11 @@ for test in file_names:
     crack_profile = crack_profile_reader(test[1])
     specimen = Specimen(W, S, B, B_N, crack_profile.initial_crack_length(), nu, E, eta_pl, sigma_YS)
 
-    ld = experimental_LD_treatment(ld, 5, False)
+    overwrite = treatement_overwrite(list_test[i])
+    if overwrite is not None:
+        ld = experimental_LD_treatment(ld, 5, overwrite[0], overwrite[1], False)
+    else:
+        ld = experimental_LD_treatment(ld, 5, debug_plot=False)
     elastic_region = elastic_region_determination_r2_max(ld, 10, False)
     ld, elastic_region = offset_LD_according_to_stiffness(ld, elastic_region)
 
@@ -141,7 +146,11 @@ for test in file_names_H:
     crack_profile = crack_profile_reader(test[1])
     specimen = Specimen(W, S, B, B_N, crack_profile.initial_crack_length(), nu, E, eta_pl, sigma_YS)
 
-    ld = experimental_LD_treatment(ld, 5, False)
+    overwrite = treatement_overwrite(list_test_H[i])
+    if overwrite is not None:
+        ld = experimental_LD_treatment(ld, 5, overwrite[0], overwrite[1], False)
+    else:
+        ld = experimental_LD_treatment(ld, 5, debug_plot=False)
     elastic_region = elastic_region_determination_r2_max(ld, 10, False)
     ld, elastic_region = offset_LD_according_to_stiffness(ld, elastic_region)
 

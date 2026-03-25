@@ -174,7 +174,7 @@ def plot_disp(ld : LoadDisplacement) -> Union[plt.Figure, plt.Axes]:
 
     return fig, ax
 
-def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int = 5, debug_plot : bool = False) -> LoadDisplacement:
+def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int = 5, begin : int = -1, end : int = -1,  debug_plot : bool = False) -> LoadDisplacement:
     """
     Treatement of the experimental data. Clamp the data to the data in ROI. Offset correctly the time and displacement.
     Create a sort array to correctly sort the data according to the dispalcement for the computation of the area under LD curve.
@@ -185,6 +185,10 @@ def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int =
         The load-displacement experimental data
     nbr_point_threshold : int, default=5
         Number of points used to compute the mean and std to find the beginning of the experiment
+    begin : int, default=-1
+        Index of the beginning of the curve. If negative, will automatically determine it
+    end : int, default=-1
+        Index of the ending of the curve. If negative, will automatically determine it
     debug_plot : bool, default=False
         If true, plot a figures containing graphs that show the different steps of the treatment
 
@@ -205,30 +209,36 @@ def experimental_LD_treatment(ld : LoadDisplacement, nbr_point_threshold : int =
     std_end = np.std(ld.disp[-nbr_point_threshold:])
 
     # Get the index at which the slope begin (need 10 values in a row above mean+5*std)
-    begin_index = 0
-    threshold = mean_begining + 5*std_begining
-    while not np.all(ld.disp[begin_index:begin_index + 10] > threshold):
-        begin_index += 1
+    if begin < 0:
+        begin_index = 0
+        threshold = mean_begining + 5*std_begining
+        while not np.all(ld.disp[begin_index:begin_index + 10] > threshold):
+            begin_index += 1
 
-        if begin_index - 10 >= len(ld.disp):
-            print("ERROR: Can not find the beginning of the U2 slope")
-            raise ValueError("Can not find the beginning of the U2 slope")
+            if begin_index - 10 >= len(ld.disp):
+                print("ERROR: Can not find the beginning of the U2 slope")
+                raise ValueError("Can not find the beginning of the U2 slope")
+    else:
+        begin_index = begin
 
     # Get the index at which the slope stop (need 10 values in a row below mean-5*std)
-    end_index = len(ld.disp) - 1
-    threshold = mean_end - 5*std_end
-    while not np.all(ld.disp[end_index-10:end_index] < threshold):
-        end_index -= 1
+    if end < 0:
+        end_index = len(ld.disp) - 1
+        threshold = mean_end - 5*std_end
+        while not np.all(ld.disp[end_index-10:end_index] < threshold):
+            end_index -= 1
 
-        if end_index < 10:
-            print("ERROR: Can not find the ending of the U2 slope")
-            raise ValueError("Can not find the ending of the U2 slope")
+            if end_index < 10:
+                print("ERROR: Can not find the ending of the U2 slope")
+                raise ValueError("Can not find the ending of the U2 slope")
 
-    # Check the end index with the force
-    for i in range(begin_index, end_index):
-        if ld.load[i+1] < 0.8*ld.load[i] and ld.load[i] > np.max(ld.load)*0.7:
-            end_index = i
-            break
+        # Check the end index with the force
+        for i in range(begin_index, end_index):
+            if ld.load[i+1] < 0.8*ld.load[i]:
+                end_index = i
+                break
+    else:
+        end_index = end
 
     # Plot before treatment
     if debug_plot:
